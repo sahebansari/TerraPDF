@@ -174,7 +174,7 @@ static void GenerateSimpleReport(string path)
                 });
             });
         });
-    }).GeneratePdf(path);
+    }).PublishPdf(path);
 
     Console.WriteLine($"  [1] Simple report    -> {path}");
 }
@@ -371,7 +371,7 @@ static void GenerateStyledNewsletter(string path)
                 });
             });
         });
-    }).GeneratePdf(path);
+    }).PublishPdf(path);
 
     Console.WriteLine($"  [2] Newsletter        -> {path}");
 }
@@ -619,7 +619,7 @@ static void GenerateInvoice(string path)
                 });
             });
         });
-    }).GeneratePdf(path);
+    }).PublishPdf(path);
 
     Console.WriteLine($"  [3] Invoice           -> {path}");
 }
@@ -799,7 +799,7 @@ static void GenerateCompanyProfile(string path, string headerImg, string smallIm
                 });
             });
         });
-    }).GeneratePdf(path);
+    }).PublishPdf(path);
 
     Console.WriteLine($"  [4] Company profile  -> {path}");
 }
@@ -990,7 +990,7 @@ static void GenerateEventBrochure(string path, string headerImg, string smallImg
                 });
             });
         });
-    }).GeneratePdf(path);
+    }).PublishPdf(path);
 
     Console.WriteLine($"  [5] Event brochure   -> {path}");
 }
@@ -1230,7 +1230,7 @@ static void GenerateProductCatalogue(string path, string headerImg, string small
                 });
             });
         });
-    }).GeneratePdf(path);
+    }).PublishPdf(path);
 
     Console.WriteLine($"  [6] Product catalogue -> {path}");
 }
@@ -1667,7 +1667,7 @@ static void GenerateProductCatalogCover(string path, string smallImg)
                 });
             });
         });
-    }).GeneratePdf(path);
+    }).PublishPdf(path);
 
     Console.WriteLine($"  [7] Product catalog cover -> {path}");
 }

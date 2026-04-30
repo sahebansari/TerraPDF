@@ -18,7 +18,7 @@ public sealed class DocumentGenerationTests
                 page.Size(PageSize.A4);
                 page.Margin(1, Unit.Centimetre);
                 page.Content().Text(text);
-            })).GeneratePdf();
+            })).PublishPdf();
 
     private static string GetHeader(byte[] bytes) =>
         System.Text.Encoding.ASCII.GetString(bytes, 0, 5);
@@ -26,19 +26,19 @@ public sealed class DocumentGenerationTests
     // ── PDF structure ─────────────────────────────────────────────────────
 
     [Fact]
-    public void GeneratePdfReturnsNonEmptyBytes()
+    public void PublishPdfReturnsNonEmptyBytes()
     {
         Assert.NotEmpty(OnePage());
     }
 
     [Fact]
-    public void GeneratePdfStartsWithPdfHeader()
+    public void PublishPdfStartsWithPdfHeader()
     {
         Assert.Equal("%PDF-", GetHeader(OnePage()));
     }
 
     [Fact]
-    public void GeneratePdfContainsPdf17Version()
+    public void PublishPdfContainsPdf17Version()
     {
         byte[] bytes  = OnePage();
         string header = System.Text.Encoding.ASCII.GetString(bytes, 0, 8);
@@ -46,7 +46,7 @@ public sealed class DocumentGenerationTests
     }
 
     [Fact]
-    public void GeneratePdfEndsWithEof()
+    public void PublishPdfEndsWithEof()
     {
         byte[] bytes = OnePage();
         // PDF ends with "%%EOF\n" - trim trailing whitespace before checking
@@ -64,7 +64,7 @@ public sealed class DocumentGenerationTests
             {
                 p.Size(PageSize.A4);
                 p.Content().Text("Hello Italic").Italic();
-            })).GeneratePdf();
+            })).PublishPdf();
 
         Assert.Equal("%PDF-", GetHeader(bytes));
     }
@@ -77,7 +77,7 @@ public sealed class DocumentGenerationTests
             {
                 p.Size(PageSize.A4);
                 p.Content().Text("Hello Bold").Bold();
-            })).GeneratePdf();
+            })).PublishPdf();
 
         Assert.Equal("%PDF-", GetHeader(bytes));
     }
@@ -94,7 +94,7 @@ public sealed class DocumentGenerationTests
                     col.Item().Text("Bold Italic").Bold();
                     col.Item().Text("Normal Italic").Italic();
                 });
-            })).GeneratePdf();
+            })).PublishPdf();
 
         Assert.Equal("%PDF-", GetHeader(bytes));
     }
@@ -115,7 +115,7 @@ public sealed class DocumentGenerationTests
                     p.Content().Text($"Page {capture}");
                 });
             }
-        }).GeneratePdf();
+        }).PublishPdf();
 
         Assert.Equal("%PDF-", GetHeader(bytes));
     }
@@ -148,15 +148,15 @@ public sealed class DocumentGenerationTests
                         row.Cell().Text("$100");
                     });
                 });
-            })).GeneratePdf();
+            })).PublishPdf();
 
         Assert.Equal("%PDF-", GetHeader(bytes));
     }
 
-    // ── GeneratePdf(stream) overload ──────────────────────────────────────
+    // ── PublishPdf(stream) overload ──────────────────────────────────────
 
     [Fact]
-    public void GeneratePdfToStreamWritesValidBytes()
+    public void PublishPdfToStreamWritesValidBytes()
     {
         using var ms = new MemoryStream();
         Document.Create(c =>
@@ -164,7 +164,7 @@ public sealed class DocumentGenerationTests
             {
                 p.Size(PageSize.A4);
                 p.Content().Text("Stream test");
-            })).GeneratePdf(ms);
+            })).PublishPdf(ms);
 
         ms.Position = 0;
         Assert.Equal("%PDF-", GetHeader(ms.ToArray()));
@@ -175,7 +175,7 @@ public sealed class DocumentGenerationTests
     [Fact]
     public void IDocumentComposeProducesValidPdf()
     {
-        byte[] bytes = Document.Create(new SimpleOnePageDocument()).GeneratePdf();
+        byte[] bytes = Document.Create(new SimpleOnePageDocument()).PublishPdf();
         Assert.Equal("%PDF-", GetHeader(bytes));
     }
 

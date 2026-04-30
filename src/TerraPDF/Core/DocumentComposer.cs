@@ -28,7 +28,7 @@ public sealed class DocumentComposer : IDocumentContainer
 
     /// <summary>Saves the PDF to the given file path.</summary>
     /// <exception cref="ArgumentException"><paramref name="path"/> is null or whitespace.</exception>
-    public void GeneratePdf(string path)
+    public void PublishPdf(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
@@ -36,7 +36,7 @@ public sealed class DocumentComposer : IDocumentContainer
     }
 
     /// <summary>Returns the PDF document as a byte array.</summary>
-    public byte[] GeneratePdf()
+    public byte[] PublishPdf()
     {
         using var ms = new MemoryStream();
         WriteTo(ms);
@@ -45,7 +45,7 @@ public sealed class DocumentComposer : IDocumentContainer
 
     /// <summary>Writes the PDF to an existing stream.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="stream"/> is <c>null</c>.</exception>
-    public void GeneratePdf(Stream stream)
+    public void PublishPdf(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
         WriteTo(stream);

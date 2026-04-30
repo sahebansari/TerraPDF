@@ -82,7 +82,7 @@ Document.Create(container =>
             });
     });
 })
-.GeneratePdf("output.pdf");
+.PublishPdf("output.pdf");
 ```
 
 ---
@@ -379,7 +379,7 @@ public class InvoiceDocument : IDocument
 }
 
 // Usage
-Document.Create(new InvoiceDocument(data)).GeneratePdf("invoice.pdf");
+Document.Create(new InvoiceDocument(data)).PublishPdf("invoice.pdf");
 ```
 
 ---
@@ -390,13 +390,13 @@ Document.Create(new InvoiceDocument(data)).GeneratePdf("invoice.pdf");
 var composer = Document.Create(...);
 
 // To file
-composer.GeneratePdf("output.pdf");
+composer.PublishPdf("output.pdf");
 
 // To byte array (HTTP responses, email attachments, etc.)
-byte[] bytes = composer.GeneratePdf();
+byte[] bytes = composer.PublishPdf();
 
 // To any writable stream
-composer.GeneratePdf(stream);
+composer.PublishPdf(stream);
 ```
 
 ---

@@ -30,25 +30,25 @@ public sealed class ValidationTests
         Assert.Throws<ArgumentNullException>(() =>
             Document.Create(c => c.Page(null!)));
 
-    // ── DocumentComposer.GeneratePdf ──────────────────────────────────────
+    // ── DocumentComposer.PublishPdf ──────────────────────────────────────
 
     [Fact]
-    public void GeneratePdfPathNullPathThrows() =>
+    public void PublishPdfPathNullPathThrows() =>
         Assert.Throws<ArgumentNullException>(() =>
             Document.Create(c => c.Page(p => p.Size(PageSize.A4)))
-                    .GeneratePdf((string)null!));
+                    .PublishPdf((string)null!));
 
     [Fact]
-    public void GeneratePdfPathWhitespacePathThrows() =>
+    public void PublishPdfPathWhitespacePathThrows() =>
         Assert.Throws<ArgumentException>(() =>
             Document.Create(c => c.Page(p => p.Size(PageSize.A4)))
-                    .GeneratePdf("   "));
+                    .PublishPdf("   "));
 
     [Fact]
-    public void GeneratePdfStreamNullStreamThrows() =>
+    public void PublishPdfStreamNullStreamThrows() =>
         Assert.Throws<ArgumentNullException>(() =>
             Document.Create(c => c.Page(p => p.Size(PageSize.A4)))
-                    .GeneratePdf((Stream)null!));
+                    .PublishPdf((Stream)null!));
 
     // ── PageDescriptor.Size ───────────────────────────────────────────────
 

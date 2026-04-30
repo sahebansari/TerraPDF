@@ -8,7 +8,7 @@ namespace TerraPDF.Tests;
 public sealed class RoundedBorderTests
 {
     private static byte[] Build(Action<IDocumentContainer> compose) =>
-        Document.Create(compose).GeneratePdf();
+        Document.Create(compose).PublishPdf();
 
     private static string PdfHeader(byte[] b) =>
         System.Text.Encoding.ASCII.GetString(b, 0, 5);

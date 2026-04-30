@@ -36,7 +36,7 @@ namespace TerraPDF.Core;
 ///             });
 ///     });
 /// })
-/// .GeneratePdf("output.pdf");
+/// .PublishPdf("output.pdf");
 /// </code>
 /// </example>
 public static class Document

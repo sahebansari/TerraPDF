@@ -12,7 +12,7 @@ namespace TerraPDF.Tests;
 public sealed class BehaviourTests
 {
     private static byte[] Build(Action<IDocumentContainer> compose) =>
-        Document.Create(compose).GeneratePdf();
+        Document.Create(compose).PublishPdf();
 
     private static string PdfHeader(byte[] b) =>
         System.Text.Encoding.ASCII.GetString(b, 0, 5);
@@ -221,7 +221,7 @@ public sealed class BehaviourTests
     [Fact]
     public void IDocumentRenders()
     {
-        byte[] bytes = Document.Create(new SimpleReport("Q1 2025")).GeneratePdf();
+        byte[] bytes = Document.Create(new SimpleReport("Q1 2025")).PublishPdf();
         Assert.Equal("%PDF-", PdfHeader(bytes));
     }
 

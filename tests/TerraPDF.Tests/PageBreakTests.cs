@@ -8,7 +8,7 @@ namespace TerraPDF.Tests;
 public sealed class PageBreakTests
 {
     private static byte[] Build(Action<IDocumentContainer> compose) =>
-        Document.Create(compose).GeneratePdf();
+        Document.Create(compose).PublishPdf();
 
     private static string PdfText(byte[] b) =>
         System.Text.Encoding.Latin1.GetString(b);

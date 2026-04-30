@@ -13,7 +13,7 @@ namespace TerraPDF.Infra;
 ///         });
 /// }
 ///
-/// Document.Create(new MyReport()).GeneratePdf("report.pdf");
+/// Document.Create(new MyReport()).PublishPdf("report.pdf");
 /// </code>
 /// </example>
 public interface IDocument
