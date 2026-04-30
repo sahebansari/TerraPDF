@@ -1,0 +1,269 @@
+using System.Globalization;
+using System.IO.Compression;
+using System.Text;
+
+namespace TerraPDF.Drawing;
+
+/// <summary>
+/// Builds and serializes a PDF 1.7 document to a stream.
+/// No third-party dependencies - pure binary PDF construction.
+/// </summary>
+internal sealed class PdfDocument
+{
+    private readonly List<PdfPage> _pages = new();
+
+    internal PdfPage AddPage(double widthPt, double heightPt)
+    {
+        var page = new PdfPage(widthPt, heightPt);
+        _pages.Add(page);
+        return page;
+    }
+
+    // --------------------------------------------------------------
+    //  Save
+    // --------------------------------------------------------------
+
+    public void Save(Stream output)
+    {
+        // PDF requires ISO-8859-1 (Latin-1) encoding for raw bytes.
+        var enc = Encoding.Latin1;
+
+        // We buffer everything into a MemoryStream so that we can record
+        // exact byte offsets for the cross-reference (xref) table.
+        using var ms = new MemoryStream();
+        void WriteStr(string s) => ms.Write(enc.GetBytes(s));
+
+        // -- Object allocation -------------------------------------
+        // Text objects: (id, body string).
+        // Binary stream objects: (id, dict string, raw stream bytes) - used for image XObjects.
+        var objects       = new List<(int id, string body)>();
+        var binaryObjects = new List<(int id, string dict, byte[] stream)>();
+        int nextId = 1;
+
+        // Standard Type1 fonts - no embedding required.
+        // F1-F6 match the StandardFont enum aliases used in PdfPage.AddText.
+        int f1Id = nextId++; // F1 Helvetica             (normal)
+        int f2Id = nextId++; // F2 Times-Bold            (bold)
+        int f3Id = nextId++; // F3 Courier               (monospace)
+        int f4Id = nextId++; // F4 Helvetica-Oblique     (italic)
+        int f5Id = nextId++; // F5 Times-BoldItalic      (bold + italic)
+        int f6Id = nextId++; // F6 Times-Italic          (italic, non-bold)
+        objects.Add((f1Id, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"));
+        objects.Add((f2Id, "<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>"));
+        objects.Add((f3Id, "<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>"));
+        objects.Add((f4Id, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>"));
+        objects.Add((f5Id, "<< /Type /Font /Subtype /Type1 /BaseFont /Times-BoldItalic /Encoding /WinAnsiEncoding >>"));
+        objects.Add((f6Id, "<< /Type /Font /Subtype /Type1 /BaseFont /Times-Italic /Encoding /WinAnsiEncoding >>"));
+
+        // Image XObjects - one PDF object per unique alias per page.
+        // We build per-page maps of alias -> object id for use in /Resources.
+        var pageImageMaps = new List<Dictionary<string, int>>();
+        foreach (var page in _pages)
+        {
+            var imgMap = new Dictionary<string, int>();
+            foreach (var (alias, img) in page.ImageObjects)
+            {
+                int imgId = nextId++;
+                imgMap[alias] = imgId;
+
+                if (img.IsJpeg)
+                {
+                    // JPEG: embed raw file bytes verbatim - PDF's DCTDecode filter handles decompression.
+                    // ColorSpace depends on component count: 1=grayscale, 3=RGB/YCbCr, 4=CMYK.
+                    string cs = img.Components switch
+                    {
+                        1 => "/DeviceGray",
+                        4 => "/DeviceCMYK",
+                        _ => "/DeviceRGB",
+                    };
+                    string dict =
+                        $"<< /Type /XObject /Subtype /Image " +
+                        $"/Width {img.Width} /Height {img.Height} " +
+                        $"/ColorSpace {cs} /BitsPerComponent 8 " +
+                        $"/Filter /DCTDecode /Length {img.Data.Length} >>";
+                    binaryObjects.Add((imgId, dict, img.Data));
+                }
+                else
+                {
+                    // PNG: compress decoded RGB pixels with zlib (FlateDecode)
+                    byte[] compressed = Compress(img.Data);
+                    string dict =
+                        $"<< /Type /XObject /Subtype /Image " +
+                        $"/Width {img.Width} /Height {img.Height} " +
+                        $"/ColorSpace /DeviceRGB /BitsPerComponent 8 " +
+                        $"/Filter /FlateDecode /Length {compressed.Length} >>";
+                    binaryObjects.Add((imgId, dict, compressed));
+                }
+            }
+            pageImageMaps.Add(imgMap);
+        }
+
+        // Content streams (one per page)
+        var contentIds = new List<int>();
+        foreach (var page in _pages)
+        {
+            string ops = page.BuildContentStream();
+            int len    = enc.GetByteCount(ops);
+            int cid    = nextId++;
+            contentIds.Add(cid);
+            objects.Add((cid, $"<< /Length {len} >>\nstream\n{ops}\nendstream"));
+        }
+
+        // Link annotation objects (one PDF object per annotation, grouped per page).
+        // Annotations reference the page they belong to via the page dict /Annots array.
+        var pageAnnotIds = new List<List<int>>();
+        foreach (var page in _pages)
+        {
+            var annotIds = new List<int>();
+            foreach (var annot in page.LinkAnnotations)
+            {
+                int annotId = nextId++;
+                // Convert from top-left origin to PDF bottom-left origin
+                double pdfX1 = annot.X;
+                double pdfY1 = page.Height - annot.Y - annot.Height;
+                double pdfX2 = annot.X + annot.Width;
+                double pdfY2 = page.Height - annot.Y;
+                // Escape parentheses and backslashes inside the URI PDF string literal
+                string uri = annot.Url.Replace("\\", "\\\\").Replace("(", "\\(").Replace(")", "\\)");
+                objects.Add((annotId,
+                    $"<< /Type /Annot /Subtype /Link " +
+                    $"/Rect [{Inv(pdfX1)} {Inv(pdfY1)} {Inv(pdfX2)} {Inv(pdfY2)}] " +
+                    $"/Border [0 0 0] " +
+                    $"/A << /Type /Action /S /URI /URI ({uri}) >> >>"));
+                annotIds.Add(annotId);
+            }
+            pageAnnotIds.Add(annotIds);
+        }
+
+        // Reserve the Pages dictionary id before we create Page objects
+        // (each Page needs a /Parent reference to it).
+        int pagesId = nextId++;
+
+        // Page objects
+        var pageIds = new List<int>();
+        for (int i = 0; i < _pages.Count; i++)
+        {
+            var p   = _pages[i];
+            int pid = nextId++;
+            pageIds.Add(pid);
+
+            // Build the /XObject sub-dictionary if this page has any images
+            string xObjectDict = pageImageMaps[i].Count > 0
+                ? "/XObject << " +
+                  string.Join(" ", pageImageMaps[i].Select(kv => $"/{kv.Key} {kv.Value} 0 R")) +
+                  " >> "
+                : string.Empty;
+
+            // Build the /Annots array if this page has any link annotations
+            string annotStr = pageAnnotIds[i].Count > 0
+                ? "/Annots [" + string.Join(" ", pageAnnotIds[i].Select(id => $"{id} 0 R")) + "] "
+                : string.Empty;
+
+            objects.Add((pid,
+                $"<< /Type /Page /Parent {pagesId} 0 R " +
+                $"/MediaBox [0 0 {Inv(p.Width)} {Inv(p.Height)}] " +
+                $"/Contents {contentIds[i]} 0 R " +
+                $"{annotStr}" +
+                $"/Resources << /Font << " +
+                    $"/F1 {f1Id} 0 R " +
+                    $"/F2 {f2Id} 0 R " +
+                    $"/F3 {f3Id} 0 R " +
+                    $"/F4 {f4Id} 0 R " +
+                    $"/F5 {f5Id} 0 R " +
+                    $"/F6 {f6Id} 0 R " +
+                $">> {xObjectDict}>> >>"));
+        }
+
+        // Pages dictionary
+        string kids = string.Join(" ", pageIds.Select(id => $"{id} 0 R"));
+        objects.Add((pagesId, $"<< /Type /Pages /Kids [{kids}] /Count {_pages.Count} >>"));
+
+        // Catalog - must be the last object so its id is known
+        int catalogId = nextId++;
+        objects.Add((catalogId, $"<< /Type /Catalog /Pages {pagesId} 0 R >>"));
+
+        // Merge text and binary objects into a single id-ordered list for xref
+        // Binary objects carry their raw stream bytes separately.
+        objects.Sort((a, b) => a.id.CompareTo(b.id));
+        binaryObjects.Sort((a, b) => a.id.CompareTo(b.id));
+
+        // -- Write header ------------------------------------------
+        WriteStr("%PDF-1.7\n");
+        // Comment with high-byte characters signals that the file is binary
+        ms.Write(new byte[] { (byte)'%', 0xE2, 0xE3, 0xCF, 0xD3, (byte)'\n' });
+
+        // -- Write body objects, recording byte offsets -------------
+        // We interleave text and binary objects in ascending id order.
+        var offsets   = new Dictionary<int, long>();
+        int txtIndex  = 0;
+        int binIndex  = 0;
+
+        while (txtIndex < objects.Count || binIndex < binaryObjects.Count)
+        {
+            bool writeBinary =
+                binIndex < binaryObjects.Count &&
+                (txtIndex >= objects.Count ||
+                 binaryObjects[binIndex].id < objects[txtIndex].id);
+
+            if (writeBinary)
+            {
+                var (id, dict, stream) = binaryObjects[binIndex++];
+                offsets[id] = ms.Position;
+                WriteStr($"{id} 0 obj\n{dict}\nstream\n");
+                ms.Write(stream);                      // raw compressed bytes
+                WriteStr("\nendstream\nendobj\n");
+            }
+            else
+            {
+                var (id, body) = objects[txtIndex++];
+                offsets[id] = ms.Position;
+                WriteStr($"{id} 0 obj\n{body}\nendobj\n");
+            }
+        }
+
+        // Total object count for xref = text objects + binary objects + free entry (obj 0)
+        int totalCount = objects.Count + binaryObjects.Count + 1;
+
+        // -- Cross-reference table ----------------------------------
+        // Each entry is exactly 20 bytes:
+        //   nnnnnnnnnn(10) SP(1) ggggg(5) SP(1) [n|f](1) SP(1) LF(1) = 20
+        long xrefOffset = ms.Position;
+
+        WriteStr("xref\n");
+        WriteStr($"0 {totalCount}\n");
+        WriteStr("0000000000 65535 f \n"); // free-list head (object 0)
+
+        for (int i = 1; i < totalCount; i++)
+            WriteStr($"{offsets[i]:D10} 00000 n \n");
+
+        // -- Trailer -----------------------------------------------
+        WriteStr("trailer\n");
+        WriteStr($"<< /Size {totalCount} /Root {catalogId} 0 R >>\n");
+        WriteStr("startxref\n");
+        WriteStr($"{xrefOffset}\n");
+        WriteStr("%%EOF\n");
+
+        // -- Flush to caller's stream ------------------------------
+        ms.Position = 0;
+        ms.CopyTo(output);
+    }
+
+    // --------------------------------------------------------------
+    //  Helpers
+    // --------------------------------------------------------------
+
+    // Formats a page dimension for the /MediaBox array using invariant culture
+    private static string Inv(double d) =>
+        d.ToString("F2", CultureInfo.InvariantCulture);
+
+    // Compresses raw bytes using zlib/deflate (FlateDecode in PDF terms)
+    private static byte[] Compress(byte[] data)
+    {
+        using var ms   = new MemoryStream();
+        using var zlib = new ZLibStream(ms, CompressionLevel.Optimal);
+        zlib.Write(data, 0, data.Length);
+        zlib.Flush();
+        zlib.Dispose();
+        return ms.ToArray();
+    }
+}

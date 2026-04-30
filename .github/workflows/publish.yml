@@ -1,0 +1,94 @@
+﻿# Publishes the TerraPDF NuGet package to nuget.org.
+#
+# Triggered automatically when a GitHub Release is published.
+# The release tag MUST follow semantic versioning with a "v" prefix (e.g. v1.2.0)
+# and MUST match the <Version> in src/TerraPDF/TerraPDF.csproj.
+#
+# Required GitHub repository secret:
+#   NUGET_API_KEY  - your nuget.org API key
+#                    (Settings -> Secrets and variables -> Actions -> New repository secret)
+#
+# How to release (full checklist):
+#   1. Bump <Version> in src/TerraPDF/TerraPDF.csproj        (e.g. 1.2.0)
+#   2. Update CHANGELOG.md - move [Unreleased] items to [1.2.0] section
+#   3. Commit everything and push to main
+#   4. On GitHub: Releases -> Draft a new release
+#      - Set tag to match the version, e.g.  v1.2.0
+#      - Copy the CHANGELOG section as release notes
+#      - Click "Publish release"
+#   => This workflow runs automatically and pushes .nupkg + .snupkg to nuget.org
+
+name: Publish NuGet
+
+on:
+  release:
+    types: [ published ]
+
+jobs:
+  publish:
+    name: Pack & Push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0       # full history required for source-link
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (Release)
+        run: dotnet build --no-restore -c Release
+
+      - name: Test
+        run: dotnet test --no-build -c Release
+
+      # Ensure the Git tag (e.g. v1.2.0) matches <Version> in the .csproj (e.g. 1.2.0).
+      # Prevents accidentally publishing the wrong version.
+      - name: Verify tag matches csproj version
+        shell: bash
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CSPROJ_VERSION=$(grep -oP '(?<=<Version>)[^<]+' src/TerraPDF/TerraPDF.csproj | tr -d '[:space:]')
+          echo "Git tag version : $TAG_VERSION"
+          echo "csproj version  : $CSPROJ_VERSION"
+          if [ "$TAG_VERSION" != "$CSPROJ_VERSION" ]; then
+            echo "::error::Release tag ($TAG_VERSION) does not match <Version> in TerraPDF.csproj ($CSPROJ_VERSION). Update the csproj before releasing."
+            exit 1
+          fi
+
+      - name: Pack
+        run: |
+          dotnet pack src/TerraPDF/TerraPDF.csproj \
+            --no-build \
+            -c Release \
+            -o ./artifacts
+
+      # Make the .nupkg and .snupkg downloadable from the Actions run page
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages-${{ github.ref_name }}
+          path: ./artifacts/
+
+      - name: Push .nupkg to nuget.org
+        run: |
+          dotnet nuget push ./artifacts/*.nupkg \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      - name: Push .snupkg symbols to nuget.org
+        run: |
+          dotnet nuget push ./artifacts/*.snupkg \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate

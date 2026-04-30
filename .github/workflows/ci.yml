@@ -1,0 +1,74 @@
+﻿# Runs on every push and PR to main:
+#   1. Build (Release, multi-target)
+#   2. Run unit tests with coverage
+#   3. Dry-run dotnet pack to verify the package can be built
+#   4. Upload test results and coverage as artifacts
+
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for source-link
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (Release)
+        run: dotnet build --no-restore -c Release
+
+      - name: Test
+        run: |
+          dotnet test --no-build -c Release \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory TestResults \
+            --collect:"XPlat Code Coverage"
+
+      # Verify that the library packs cleanly on every CI run.
+      # This catches missing files, bad metadata, or SourceLink errors early,
+      # well before a release is attempted.
+      - name: Pack (dry run)
+        run: |
+          dotnet pack src/TerraPDF/TerraPDF.csproj \
+            --no-build \
+            -c Release \
+            -o ./artifacts
+
+      - name: Upload package (dry-run artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-ci-package
+          path: ./artifacts/
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: "**/coverage.cobertura.xml"

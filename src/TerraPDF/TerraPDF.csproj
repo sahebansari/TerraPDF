@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Support current LTS (.NET 8) and latest stable (.NET 9) -->
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+
+    <!-- Quality gates -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Suppress missing-XML-doc warnings on intentionally internal/private members -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- Reproducible / deterministic build -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- ── NuGet package identity ───────────────────────────────────────── -->
+    <PackageId>TerraPDF</PackageId>
+    <Version>1.2.0</Version>
+    <Authors>TerraPDF Contributors</Authors>
+    <Copyright>Copyright © 2025-2026 TerraPDF Contributors</Copyright>
+    <PackageProjectUrl>https://github.com/sahebansari/TerraPDF</PackageProjectUrl>
+    <Description>
+      A lightweight, zero-dependency, pure C# library for generating PDF 1.7 documents
+      with a fluent, composable API. Features include rich text styling (bold, italic,
+      underline, strikethrough, custom line-height), multi-span mixed formatting,
+      Column / Row / Table layouts, PNG and JPEG image embedding, rounded and per-edge
+      borders, explicit page breaks, clickable hyperlink annotations, headers, footers,
+      page numbers, and a full Material Design colour palette — with no native binaries
+      and no third-party runtime dependencies.
+    </Description>
+    <PackageTags>pdf;pdf-generation;document;reporting;fluent-api;invoice;table;image;no-dependency;zero-dependency;dotnet;csharp</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>https://github.com/sahebansari/TerraPDF/blob/main/CHANGELOG.md</PackageReleaseNotes>
+
+    <!-- ── Source Link / reproducible build ────────────────────────────── -->
+    <RepositoryUrl>https://github.com/sahebansari/TerraPDF</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <!-- Bundle the README into the NuGet package -->
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Source Link — maps PDB paths back to GitHub source for debugger step-in -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <!-- Allow unit-test project to access internal APIs -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>TerraPDF.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>
+

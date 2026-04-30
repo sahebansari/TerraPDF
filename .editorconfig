@@ -1,0 +1,58 @@
+root = true
+
+# ── All files ──────────────────────────────────────────────────────────────
+[*]
+charset                  = utf-8
+end_of_line              = crlf
+indent_style             = space
+insert_final_newline     = true
+trim_trailing_whitespace = true
+
+# ── C# source files ────────────────────────────────────────────────────────
+[*.cs]
+indent_size = 4
+
+# Prefer file-scoped namespace declarations
+csharp_style_namespace_declarations                      = file_scoped:warning
+
+# Expression-bodied members
+csharp_style_expression_bodied_methods                   = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties                = true:suggestion
+csharp_style_expression_bodied_constructors              = false:none
+
+# Pattern matching
+csharp_style_pattern_matching_over_is_with_cast_check    = true:warning
+csharp_style_prefer_switch_expression                    = true:suggestion
+
+# Null checks
+csharp_style_prefer_null_check_over_type_check           = true:suggestion
+dotnet_style_null_propagation                            = true:warning
+dotnet_style_coalesce_expression                         = true:warning
+
+# var usage
+csharp_style_var_for_built_in_types                      = false:none
+csharp_style_var_when_type_is_apparent                   = true:suggestion
+csharp_style_var_elsewhere                               = false:none
+
+# Sorting imports
+dotnet_sort_system_directives_first                      = true
+dotnet_separate_import_directive_groups                  = false
+
+# Naming conventions (PascalCase for public, camelCase for private fields)
+dotnet_naming_rule.private_fields_should_be_camel_case.severity = warning
+dotnet_naming_rule.private_fields_should_be_camel_case.symbols  = private_fields
+dotnet_naming_rule.private_fields_should_be_camel_case.style    = camel_case_underscore_prefix
+
+dotnet_naming_symbols.private_fields.applicable_kinds           = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_style.camel_case_underscore_prefix.capitalization  = camel_case
+dotnet_naming_style.camel_case_underscore_prefix.required_prefix = _
+
+# ── XML / XAML / JSON ──────────────────────────────────────────────────────
+[*.{xml,csproj,props,targets,yml,yaml,json}]
+indent_size = 2
+
+# ── Markdown ───────────────────────────────────────────────────────────────
+[*.md]
+trim_trailing_whitespace = false

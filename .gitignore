@@ -1,0 +1,49 @@
+# ── Build outputs ────────────────────────────────────────────────
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+artifacts/
+
+# ── Visual Studio ─────────────────────────────────────────────────
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# ── Rider ─────────────────────────────────────────────────────────
+.idea/
+*.sln.iml
+
+# ── .NET test results ─────────────────────────────────────────────
+TestResults/
+*.trx
+coverage/
+*.cobertura.xml
+*.opencover.xml
+
+# ── NuGet ─────────────────────────────────────────────────────────
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+# Except NuGet.Config checked in for reproducibility
+!NuGet.Config
+
+# ── Publish output ────────────────────────────────────────────────
+publish/
+
+# ── OS artefacts ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Environment / secrets ─────────────────────────────────────────
+.env
+*.env.local
+secrets.json
+appsettings.*.json
+
+# ── Logs ──────────────────────────────────────────────────────────
+*.log

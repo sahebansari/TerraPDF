@@ -1,0 +1,23 @@
+<Project>
+
+  <!--
+    Shared MSBuild properties applied to every project in the repository.
+    Project-level settings take precedence and can override these.
+  -->
+  <PropertyGroup>
+    <!-- Language -->
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Analysis -->
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Assembly metadata (overridden per project where needed) -->
+    <Company>TerraPDF Contributors</Company>
+    <Copyright>Copyright © 2025-2026 TerraPDF Contributors</Copyright>
+    <Product>TerraPDF</Product>
+  </PropertyGroup>
+
+</Project>
