@@ -1,6 +1,6 @@
 # TerraPDF
 
-[![CI](https://github.com/sahebansari/TerraPDF/actions/workflows/ci.yml/badge.svg)](https://github.com/sahebansari/TerraPDF/actions/workflows/ci.yml)
+[![CI](https://github.com/sahebansari/TerraPDF/blob/master/.github/workflows/ci.yml/badge.svg)](https://github.com/sahebansari/TerraPDF/blob/master/.github/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/TerraPDF.svg)](https://www.nuget.org/packages/TerraPDF)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
