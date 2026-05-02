@@ -43,8 +43,8 @@
      <IncludeSymbols>true</IncludeSymbols>
      <SymbolPackageFormat>snupkg</SymbolPackageFormat>
      <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-     <Title>TerraPDF - A lightweight PDF library for dotnet developers</Title>
-     <PackageIcon>logo.png</PackageIcon>
+      <Title>TerraPDF - A lightweight PDF library for dotnet developers</Title>
+      <PackageIcon>icon.png</PackageIcon>
      <AssemblyVersion>1.2.1</AssemblyVersion>
      <FileVersion>1.2.1</FileVersion>
   </PropertyGroup>
@@ -65,13 +65,13 @@
       <_Parameter1>TerraPDF.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
-   <ItemGroup>
-     <None Include="logo.png">
-       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-       <Pack>True</Pack>
-       <PackagePath>\</PackagePath>
-     </None>
-   </ItemGroup>
+    <ItemGroup>
+      <None Include="icon.png">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        <Pack>True</Pack>
+        <PackagePath>\</PackagePath>
+      </None>
+    </ItemGroup>
 
 </Project>
 
