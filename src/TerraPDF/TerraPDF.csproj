@@ -14,36 +14,39 @@
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
 
-    <!-- ── NuGet package identity ───────────────────────────────────────── -->
-    <PackageId>TerraPDF</PackageId>
-    <Version>1.2.0</Version>
-    <Authors>Saheb Ansari</Authors>
-    <Copyright>Copyright © 2025-2026 TerraPDF Contributors</Copyright>
-    <PackageProjectUrl>https://github.com/sahebansari/TerraPDF</PackageProjectUrl>
-    <Description>
-      A lightweight, zero-dependency, pure C# library for generating PDF 1.7 documents
-      with a fluent, composable API. Features include rich text styling (bold, italic,
-      underline, strikethrough, custom line-height), multi-span mixed formatting,
-      Column / Row / Table layouts, PNG and JPEG image embedding, rounded and per-edge
-      borders, explicit page breaks, clickable hyperlink annotations, headers, footers,
-      page numbers, and a full Material Design colour palette — with no native binaries
-      and no third-party runtime dependencies.
-    </Description>
-    <PackageTags>pdf;pdf-generation;document;reporting;fluent-api;invoice;table;image;no-dependency;zero-dependency;dotnet;csharp</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>https://github.com/sahebansari/TerraPDF/blob/main/CHANGELOG.md</PackageReleaseNotes>
+     <!-- ── NuGet package identity ───────────────────────────────────────── -->
+     <PackageId>TerraPDF</PackageId>
+     <Version>1.2.1</Version>
+     <Authors>Saheb Ansari</Authors>
+     <Copyright>Copyright © 2025-2026 TerraPDF Contributors</Copyright>
+     <PackageProjectUrl>https://github.com/sahebansari/TerraPDF</PackageProjectUrl>
+     <Description>
+       A lightweight, zero-dependency, pure C# library for generating PDF 1.7 documents
+       with a fluent, composable API. Features include rich text styling (bold, italic,
+       underline, strikethrough, custom line-height), multi-span mixed formatting,
+       Column / Row / Table layouts, PNG and JPEG image embedding, rounded and per-edge
+       borders, explicit page breaks, clickable hyperlink annotations, headers, footers,
+       page numbers, and a full Material Design colour palette — with no native binaries
+       and no third-party runtime dependencies.
+     </Description>
+     <PackageTags>pdf;pdf-generation;document;reporting;fluent-api;invoice;table;image;no-dependency;zero-dependency;dotnet;csharp</PackageTags>
+     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+     <PackageReadmeFile>README.md</PackageReadmeFile>
+     <PackageReleaseNotes>https://github.com/sahebansari/TerraPDF/blob/master/CHANGELOG.md</PackageReleaseNotes>
 
-    <!-- ── Source Link / reproducible build ────────────────────────────── -->
-    <RepositoryUrl>https://github.com/sahebansari/TerraPDF</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Title>TerraPDF - A lightweight PDF library for dotnet developers</Title>
+     <!-- ── Source Link / reproducible build ────────────────────────────── -->
+     <RepositoryUrl>https://github.com/sahebansari/TerraPDF</RepositoryUrl>
+     <RepositoryType>git</RepositoryType>
+     <PublishRepositoryUrl>true</PublishRepositoryUrl>
+     <EmbedUntrackedSources>true</EmbedUntrackedSources>
+     <IncludeSymbols>true</IncludeSymbols>
+     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+     <Title>TerraPDF - A lightweight PDF library for dotnet developers</Title>
+     <PackageIcon>logo.png</PackageIcon>
+     <AssemblyVersion>1.2.1</AssemblyVersion>
+     <FileVersion>1.2.1</FileVersion>
   </PropertyGroup>
 
   <!-- Bundle the README into the NuGet package -->
@@ -62,6 +65,13 @@
       <_Parameter1>TerraPDF.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
+   <ItemGroup>
+     <None Include="logo.png">
+       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+       <Pack>True</Pack>
+       <PackagePath>\</PackagePath>
+     </None>
+   </ItemGroup>
 
 </Project>
 

@@ -6,7 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.2.1] - 2026-05-03
+
+### Documentation
+- Corrected all `GeneratePdf()` → `PublishPdf()` method references throughout README and all documentation files
+- Fixed `Color.Blue` hex values: Darken2 (`#1976D2`), added missing Darken3 (`#1565C0`) and Darken4 (`#0D47A1`)
+- Added `PageBreak()` to `ColumnDescriptor` API table in layout guide
+- Documented `HeaderOnFirstPageOnly()` page method for first-page-only headers
+- Clarified `RelativeItem()` default weight = 1 in row-and-column layout guide
+- Added `FontFamily(string)` to `TextDescriptor` methods table in text-and-spans guide
 
 ---
 
@@ -40,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PageBreakTests.cs` — tests for explicit page-break positioning.
 - `HeaderFirstPageOnlyTests.cs` — tests verifying that the header slot can be
   conditionally rendered only on the first page using `ShowIf`.
+
+### Fixed
+- **Breaking (behaviour):** `TextDescriptor.Span().Bold()` / `.Italic()` /
+  `.Strikethrough()` etc. previously mutated the whole block's `SpanStyle`
+  instead of the individual span's style. Now correctly isolated.
+
+### Changed
+- Folder `Fluent` renamed to `Core` (`TerraPDF.Core` namespace).
+- Folder `Infrastructure` renamed to `Infra` (`TerraPDF.Infra` namespace).
 
 ---
 
@@ -102,7 +119,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI workflow (GitHub Actions): build, test, coverage.
 - Publish workflow (GitHub Actions): NuGet + symbols on release tag.
 
-[Unreleased]: https://github.com/sahebansari/TerraPDF/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/sahebansari/TerraPDF/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/sahebansari/TerraPDF/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/sahebansari/TerraPDF/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/sahebansari/TerraPDF/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/sahebansari/TerraPDF/releases/tag/v1.0.0

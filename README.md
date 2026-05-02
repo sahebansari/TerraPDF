@@ -1,7 +1,11 @@
 # TerraPDF
 
+![TerraPDF Logo](logo.png)
+
 [![NuGet](https://img.shields.io/nuget/v/TerraPDF.svg)](https://www.nuget.org/packages/TerraPDF)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+📚 **Documentation:** https://github.com/sahebansari/TerraPDF/tree/master/docs
 
 **TerraPDF** is a lightweight, zero-dependency, pure C# library for generating professional PDF 1.7 documents programmatically. 
 It provides a fluent, composable API that covers the full document-authoring lifecycle — from page layout and 
@@ -484,21 +488,7 @@ Color.Black            // "#000000"
 
 ---
 
-## Documentation
 
-| Guide | Description |
-|-------|-------------|
-| [Getting Started](docs/getting-started.md) | Installation, namespaces, minimal example, output methods |
-| [Page Sizes & Units](docs/page-sizes-and-units.md) | All standard page sizes, landscape, custom sizes, unit conversions |
-| [Components & Templates](docs/components-and-templates.md) | Reusable `IComponent` blocks and `IDocument` templates |
-| [Layout](docs/layout.md) | Column, Row, Table — nesting and sizing rules |
-| [Row & Column Layout](docs/row-and-column-layout.md) | Deep dive with ASCII diagrams and composition examples |
-| [Text & Spans](docs/text-and-spans.md) | Single-string text, underline, line-height, multi-span formatting, page numbers, style resolution |
-| [Decorators](docs/decorators.md) | Padding, Margin, Background, Border, Rounded Border, Per-Edge Borders, Alignment, Lines, PageBreak, Hyperlink, ShowIf |
-| [Images](docs/images.md) | PNG/JPEG embedding, fixed width, positioning |
-| [Colors](docs/colors.md) | Full Material Design palette reference with hex values |
-
----
 
 ## Building from Source
 
