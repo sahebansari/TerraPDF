@@ -71,7 +71,9 @@ to `Darken4` (near-black). Not all families have every shade.
 | `Color.Blue.Lighten1` | `#42A5F5` |
 | `Color.Blue.Medium`   | `#2196F3` |
 | `Color.Blue.Darken1`  | `#1E88E5` |
-| `Color.Blue.Darken2`  | `#1565C0` |
+| `Color.Blue.Darken2`  | `#1976D2` |
+| `Color.Blue.Darken3`  | `#1565C0` |
+| `Color.Blue.Darken4`  | `#0D47A1` |
 
 ### Teal
 | Constant | Hex |

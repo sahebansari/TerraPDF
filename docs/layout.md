@@ -48,6 +48,7 @@ col.Item().Text("Right");
 | `AlignItemsCenter()` | Centre-align subsequent items |
 | `AlignItemsRight()` | Right-align subsequent items |
 | `Item()` | Adds an item slot; returns `IContainer` |
+| `PageBreak()` | Inserts an explicit page break at this position |
 
 ---
 
@@ -157,6 +158,20 @@ container.Table(table =>
 
 > **Tip:** Cells support the full decorator chain:
 > `row.Cell().Background(bg).Padding(6).AlignRight().Text("value")`
+
+---
+
+## Header on First Page Only
+
+By default, the page header appears on every page. Use `HeaderOnFirstPageOnly()` to
+show the header only on the first page, freeing vertical space for content on continuation pages:
+
+```csharp
+page.Header().Text("Confidential").Bold();
+page.HeaderOnFirstPageOnly();  // header only on page 1
+```
+
+This is useful for cover pages or documents where the header should not repeat.
 
 ---
 

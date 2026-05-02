@@ -43,13 +43,13 @@ Document.Create(container =>
         page.Footer().AlignCenter().Text(t =>
         {
             t.Span("Page ");
-            t.CurrentPageNumber().FontSize(9);
+            t.CurrentPageNumber();
             t.Span(" / ");
-            t.TotalPages().FontSize(9);
+            t.TotalPages();
         });
     });
 })
-.GeneratePdf("output.pdf");
+.PublishPdf("output.pdf");
 ```
 
 ---
@@ -58,10 +58,10 @@ Document.Create(container =>
 
 ```csharp
 // Inline callback
-Document.Create(container => { ... }).GeneratePdf("output.pdf");
+Document.Create(container => { ... }).PublishPdf("output.pdf");
 
 // Reusable IDocument class
-Document.Create(new MyReport(data)).GeneratePdf("output.pdf");
+Document.Create(new MyReport(data)).PublishPdf("output.pdf");
 ```
 
 ---
@@ -103,14 +103,14 @@ container.Page(page =>
 var composer = Document.Create(...);
 
 // Write to file
-composer.GeneratePdf("report.pdf");
+composer.PublishPdf("report.pdf");
 
 // Return as byte array (API responses, email attachments)
-byte[] bytes = composer.GeneratePdf();
+byte[] bytes = composer.PublishPdf();
 
 // Write to any stream
 using var stream = new MemoryStream();
-composer.GeneratePdf(stream);
+composer.PublishPdf(stream);
 ```
 
 ---

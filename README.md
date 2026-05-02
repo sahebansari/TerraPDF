@@ -1,6 +1,5 @@
 # TerraPDF
 
-[![CI](https://github.com/sahebansari/TerraPDF/blob/master/.github/workflows/ci.yml/badge.svg)](https://github.com/sahebansari/TerraPDF/blob/master/.github/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/TerraPDF.svg)](https://www.nuget.org/packages/TerraPDF)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -355,6 +354,38 @@ public class CalloutBox : IComponent
 
 // Usage
 container.Component(new CalloutBox("Note: this is important."));
+```
+---
+## Reusable Document Template
+```csharp
+public class InvoiceDocument : IDocument
+{
+    private readonly InvoiceData _data;
+    public InvoiceDocument(InvoiceData data) => _data = data;
+
+    public void Compose(IDocumentContainer container)
+    {
+        container.Page(page =>
+        {
+            page.Size(PageSize.A4);
+            page.Margin(2, Unit.Centimetre);
+            page.Content().Text($"Invoice #{_data.Number}").Bold().FontSize(24);
+        });
+    }
+}
+// Usage
+Document.Create(new InvoiceDocument(data)).PublishPdf("invoice.pdf");
+```
+---
+## Output Methods
+```csharp
+var composer = Document.Create(...);
+// To file
+composer.PublishPdf("output.pdf");
+// To byte array (HTTP responses, email attachments, etc.)
+byte[] bytes = composer.PublishPdf();
+// To any writable stream
+composer.PublishPdf(stream);
 ```
 
 ---

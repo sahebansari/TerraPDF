@@ -74,7 +74,7 @@ container.Row(row =>
 | Method | Behaviour |
 |--------|-----------|
 | `AutoItem()` | Width = natural content width (measured first) |
-| `RelativeItem(weight)` | Width = proportional share of remaining space after auto/constant items |
+| `RelativeItem(weight = 1)` | Width = proportional share of remaining space after auto/constant items (default weight = 1) |
 | `ConstantItem(pts)` | Width = fixed number of PDF points, always |
 
 ### What happens internally

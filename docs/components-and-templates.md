@@ -171,13 +171,13 @@ public class InvoiceDocument : IDocument
 var data = new InvoiceData("2025-042", "Acme Corp.", 14_250.00m);
 
 // To file
-Document.Create(new InvoiceDocument(data)).GeneratePdf("invoice.pdf");
+Document.Create(new InvoiceDocument(data)).PublishPdf("invoice.pdf");
 
 // To byte array
-byte[] pdf = Document.Create(new InvoiceDocument(data)).GeneratePdf();
+byte[] pdf = Document.Create(new InvoiceDocument(data)).PublishPdf();
 
 // To stream
-Document.Create(new InvoiceDocument(data)).GeneratePdf(responseStream);
+Document.Create(new InvoiceDocument(data)).PublishPdf(responseStream);
 ```
 
 ---
