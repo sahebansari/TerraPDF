@@ -1,9 +1,11 @@
 using System.Globalization;
+using System.IO;
 using TerraPDF.Core;
 using TerraPDF.Helpers;
+using TerraPDF.Sample;
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  TerraPDF Samples  –  seven PDFs from simple to complex, saved to Desktop.
+//  TerraPDF Samples  –  eight PDFs from simple to complex, saved to Desktop.
 // ─────────────────────────────────────────────────────────────────────────────
 
 string desktop  = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
@@ -19,8 +21,7 @@ GenerateEventBrochure        (Path.Combine(desktop, "05_event_brochure.pdf"),   
 GenerateProductCatalogue     (Path.Combine(desktop, "06_product_catalogue.pdf"),      headerImg, smallImg);
 GenerateProductCatalogCover  (Path.Combine(desktop, "07_product_catalog_cover.pdf"),  smallImg);
 GenerateReportWithBookmarks  (Path.Combine(desktop, "08_report_with_bookmarks.pdf"));
-
-Console.WriteLine("All PDFs saved to Desktop.");
+GenerateReportWithToc       (Path.Combine(desktop, "09_report_with_toc.pdf"));
 
 // =============================================================================
 //  1. SIMPLE REPORT
@@ -34,6 +35,13 @@ static void GenerateSimpleReport(string path)
 
     Document.Create(doc =>
     {
+        // ── Document metadata ──────────────────────────────────────────────
+        doc.MetadataTitle("TerraPDF Developer Guide");
+        doc.MetadataAuthor("TerraPDF Engineering Team");
+        doc.MetadataSubject("Comprehensive guide to TerraPDF features and APIs");
+        doc.MetadataKeywords("pdf; terra; dotnet; guide; documentation");
+        doc.MetadataCreator("TerraPDF Sample Generator v1.0");
+
         doc.Page(page =>
         {
             page.Size(PageSize.A4);
@@ -1687,6 +1695,13 @@ static void GenerateReportWithBookmarks(string path)
 
     Document.Create(doc =>
     {
+        // ── Document metadata ──────────────────────────────────────────────
+        doc.MetadataTitle("TerraPDF Developer Guide");
+        doc.MetadataAuthor("TerraPDF Engineering Team");
+        doc.MetadataSubject("Comprehensive guide to TerraPDF features and APIs");
+        doc.MetadataKeywords("pdf; terra; dotnet; guide; documentation");
+        doc.MetadataCreator("TerraPDF Sample Generator v1.0");
+
         // ── Define bookmarks ───────────────────────────────────────────────
         // Top-level bookmarks
         doc.Bookmark("Introduction", 1,   120.0);
@@ -2032,5 +2047,16 @@ static void GenerateReportWithBookmarks(string path)
     }).PublishPdf(path);
 
     Console.WriteLine($"  [8] Bookmarks demo     -> {path}");
+}
+
+// =============================================================================
+//  9. TABLE OF CONTENTS
+//  Shows: automatic TOC generation from H1-H6 headings, internal hyperlinks,
+//  and placeholder measurement.
+// =============================================================================
+static void GenerateReportWithToc(string path)
+{
+    Document.Create(new ReportWithToc()).PublishPdf(path);
+    Console.WriteLine($"  [9] TOC demo           -> {path}");
 }
 

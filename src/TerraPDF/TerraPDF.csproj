@@ -16,10 +16,10 @@
 
      <!-- ── NuGet package identity ───────────────────────────────────────── -->
      <PackageId>TerraPDF</PackageId>
-     <Version>1.2.1</Version>
-     <Authors>Saheb Ansari</Authors>
-     <Copyright>Copyright © 2025-2026 TerraPDF Contributors</Copyright>
-     <PackageProjectUrl>https://github.com/sahebansari/TerraPDF</PackageProjectUrl>
+      <Version>1.2.2</Version>
+      <Authors>Saheb Ansari</Authors>
+      <Copyright>Copyright © 2025-2026 TerraPDF Contributors</Copyright>
+      <PackageProjectUrl>https://github.com/sahebansari/TerraPDF</PackageProjectUrl>
      <Description>
        A lightweight, zero-dependency, pure C# library for generating PDF 1.7 documents
        with a fluent, composable API. Features include rich text styling (bold, italic,
@@ -45,8 +45,8 @@
      <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
       <Title>TerraPDF - A lightweight PDF library for dotnet developers</Title>
       <PackageIcon>icon.png</PackageIcon>
-     <AssemblyVersion>1.2.1</AssemblyVersion>
-     <FileVersion>1.2.1</FileVersion>
+       <AssemblyVersion>1.2.2</AssemblyVersion>
+       <FileVersion>1.2.2</FileVersion>
   </PropertyGroup>
 
   <!-- Bundle the README into the NuGet package -->

@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.2] - 2026-05-04
+
+### Added
+- **Table of Contents generation** — `container.TableOfContents()` creates a TOC page populated with headings collected from `.H1()`–`.H6()`, with hierarchical numbering (e.g. 1, 1.1, 1.1.1) and clickable internal links.
+- **Internal links (GoTo)** — `container.InternalLink(pageNumber, top?)` creates intra-document navigation that preserves current zoom level and scrolls to the target heading.
+- **Section headings** — `.H1()` through `.H6()` methods with sensible default styles (size + weight), each returning `TextDescriptor` for further customisation.
+
+### Fixed
+- Internal link zoom issue — `/FitH` replaced with `/XYZ` so clicking TOC entries no longer resets zoom.
+- Page number display in TOC now excludes TOC page count (TOC treated as page zero), while links still point to correct physical pages.
+- `HeadingRecorder` propagation through `DrawingContext.At` fixed so TOC entries are correctly collected.
+
+---
+
 ## [1.2.1] - 2026-05-03
 
 ### Documentation

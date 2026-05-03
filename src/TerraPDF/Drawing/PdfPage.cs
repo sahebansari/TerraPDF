@@ -191,12 +191,22 @@ internal sealed class PdfPage
     /// <summary>A clickable URI annotation rectangle in top-left-origin coordinates.</summary>
     internal readonly record struct LinkAnnotation(double X, double Y, double Width, double Height, string Url);
 
+    /// <summary>A clickable internal link (GoTo) annotation rectangle in top-left-origin coordinates.</summary>
+    internal readonly record struct InternalLinkAnnotation(double X, double Y, double Width, double Height, int PageNumber, double? Top);
+
     /// <summary>Link annotations registered on this page by <see cref="Elements.Link"/> elements.</summary>
     internal List<LinkAnnotation> LinkAnnotations { get; } = [];
+
+    /// <summary>Internal link annotations (GoTo) registered on this page by <see cref="Elements.InternalLinkElement"/>.</summary>
+    internal List<InternalLinkAnnotation> InternalLinkAnnotations { get; } = [];
 
     /// <summary>Registers a URI annotation that covers the given bounding box.</summary>
     internal void AddLinkAnnotation(double x, double y, double width, double height, string url) =>
         LinkAnnotations.Add(new LinkAnnotation(x, y, width, height, url));
+
+    /// <summary>Registers an internal link annotation that jumps to a specific page and position.</summary>
+    internal void AddInternalLinkAnnotation(double x, double y, double width, double height, int pageNumber, double? top) =>
+        InternalLinkAnnotations.Add(new InternalLinkAnnotation(x, y, width, height, pageNumber, top));
 
     // --------------------------------------------------------------
     //  Image XObjects

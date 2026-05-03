@@ -27,13 +27,16 @@ runtime packages, and no licensing restrictions.
 - Column, Row, and Table layouts
 - PNG and JPEG image embedding
 - Horizontal and vertical rule lines
-- Explicit page breaks via `PageBreak()`
-- Clickable hyperlink (URI) annotations via `Hyperlink()`
-- PDF bookmarks / outlines with hierarchical nesting
-- Conditional rendering via `ShowIf`
-- Reusable components via `IComponent`
-- Headers, footers, and page numbers
-- Fluent, composable API
+ - Explicit page breaks via `PageBreak()`
+ - Clickable hyperlink (URI) annotations via `Hyperlink()`
+ - Internal document links (GoTo) via `InternalLink()`
+ - Automatic Table of Contents generation from H1–H6 headings
+ - PDF bookmarks / outlines with hierarchical nesting
+ - Document metadata (Title, Author, Subject, Keywords, Creator)
+ - Conditional rendering via `ShowIf`
+ - Reusable components via `IComponent`
+ - Headers, footers, and page numbers
+ - Fluent, composable API
 
 ---
 
@@ -304,6 +307,16 @@ container.Hyperlink("https://example.com").Text("Click here");
 container.Hyperlink("https://example.com").Image("logo.png", 120);
 ```
 
+### Internal Link
+
+Wrap content in a clickable internal hyperlink that jumps to a specific page and optional vertical position:
+
+```csharp
+container.InternalLink(pageNumber, topPosition).Text("Go to section");
+```
+
+This creates a `/GoTo` action in the PDF. The automatic Table of Contents uses internal links to make each entry clickable.
+
 ### Alignment
 
 ```csharp
@@ -342,6 +355,72 @@ container.Image("path/to/photo.jpg");
 // Fixed width in points, can be positioned with alignment
 container.AlignCenter().Image("logo.png", 120);
 ```
+
+---
+
+## Headings
+
+TerraPDF provides six levels of section headings: `.H1()` through `.H6()`. Each heading uses sensible defaults (size + weight), which you can further customise via the fluent `TextDescriptor` API.
+
+```csharp
+container.H1("Chapter Title").FontColor(Color.Blue.Darken2);
+container.H2("Section Title").Underline();
+container.H3("Subsection");
+```
+
+### Default heading styles
+
+| Level | Font size | Style |
+|-------|-----------|-------|
+| H1 | 24 pt | Bold |
+| H2 | 20 pt | Bold |
+| H3 | 16 pt | Bold |
+| H4 | 14 pt | Italic |
+| H5 | 12 pt | Bold |
+| H6 | 11 pt | Regular |
+
+---
+
+## Table of Contents
+
+Call `container.TableOfContents()` to add a contents page that is automatically populated with all headings in the document. Headings appear with correct logical page numbers (excluding the TOC page itself) and clickable internal links that jump to the exact physical page.
+
+```csharp
+Document.Create(container =>
+{
+    // Create a Table of Contents page
+    container.TableOfContents(p =>
+    {
+        p.Size(PageSize.A4);
+        p.Margin(2, Unit.Centimetre);
+        p.DefaultTextStyle(s => s.FontSize(11));
+    });
+
+    // Chapters with headings
+    container.Page(p =>
+    {
+        p.Content()
+            .H1("Introduction")
+            .H2("Getting Started")
+            .H3("Installation")
+            .H4("NuGet Package");
+    });
+
+    container.Page(p =>
+    {
+        p.Content()
+            .H1("Core Features")
+            .H2("Text & Typography")
+            .H2("Layout Containers")
+            .H2("Tables");
+    });
+})
+.PublishPdf("toc_demo.pdf");
+```
+
+> **Note:** Page numbers displayed in the TOC start from 1 for the first page *after* the TOC (i.e., the TOC page is treated as page 0). The internal links point to the correct physical pages, accounting for the TOC's actual page count.
+
+**Two-pass rendering** TerraPDF performs an initial measurement pass to collect heading positions and page numbers, then emits the final PDF with accurate TOC links.
 
 ---
 

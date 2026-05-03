@@ -121,7 +121,9 @@ composer.PublishPdf(stream);
 - [Layout](layout.md) — Column, Row, Table
 - [Decorators](decorators.md) — Padding, Margin, Background, Border, Rounded Border, Per-Edge Borders, Alignment, Lines, PageBreak, Hyperlink, ShowIf
 - [Images](images.md) — PNG and JPEG embedding
+- [Table of Contents](table-of-contents.md) — headings, automatic TOC generation, internal links
 - [Bookmarks](bookmarks.md) — PDF outlines / hierarchical navigation tree
+- [Metadata](metadata.md) — document properties (Title, Author, Subject, Keywords, Creator)
 - [Colors](colors.md) — full built-in palette reference
 - [Page Sizes & Units](page-sizes-and-units.md) — all standard sizes and unit conversions
 - [Components & Templates](components-and-templates.md) — reusable `IComponent` and `IDocument`

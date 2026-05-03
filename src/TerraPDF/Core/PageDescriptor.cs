@@ -35,6 +35,8 @@ public sealed class PageDescriptor
     /// </summary>
     internal bool HeaderFirstPageOnly { get; private set; }
 
+    internal bool IsTableOfContents { get; set; }
+
     // -- Page size -------------------------------------------------
 
     /// <summary>Sets the page dimensions using a standard size tuple (e.g. <c>PageSize.A4</c>).</summary>

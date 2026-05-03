@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
@@ -19,6 +20,13 @@ internal sealed class PdfDocument
     private List<BookmarkInfo>? _allBookmarks; // all bookmark nodes
     private int _totalLogicalPages;
 
+    // Document metadata (Info dictionary)
+    private string? _infoTitle;
+    private string? _infoAuthor;
+    private string? _infoSubject;
+    private string? _infoKeywords;
+    private string? _infoCreator;
+
     /// <summary>
     /// Associates a bookmark collection and the total logical page count with this document.
     /// Called by DocumentComposer before rendering.
@@ -27,6 +35,18 @@ internal sealed class PdfDocument
     {
         _allBookmarks = allBookmarks;
         _totalLogicalPages = totalLogicalPages;
+    }
+
+    /// <summary>
+    /// Sets document metadata fields for the Info dictionary.
+    /// </summary>
+    internal void SetMetadata(string? title, string? author, string? subject, string? keywords, string? creator)
+    {
+        _infoTitle    = title;
+        _infoAuthor   = author;
+        _infoSubject  = subject;
+        _infoKeywords = keywords;
+        _infoCreator  = creator;
     }
 
     internal PdfPage AddPage(double widthPt, double heightPt)
@@ -152,17 +172,55 @@ internal sealed class PdfDocument
             pageAnnotIds.Add(annotIds);
         }
 
-        // Reserve the Pages dictionary id before we create Page objects
-        // (each Page needs a /Parent reference to it).
+        // Allocate page object IDs first (needed for internal link destinations)
         int pagesId = nextId++;
-
-        // Page objects
         var pageIds = new List<int>();
         for (int i = 0; i < _pages.Count; i++)
         {
-            var p   = _pages[i];
-            int pid = nextId++;
-            pageIds.Add(pid);
+            pageIds.Add(nextId++);
+        }
+
+        // Create Pages dictionary object (references page IDs)
+        string kids = string.Join(" ", pageIds.Select(id => $"{id} 0 R"));
+        objects.Add((pagesId, $"<< /Type /Pages /Kids [{kids}] /Count {_pages.Count} >>"));
+
+        // Internal link annotations (GoTo destinations)
+        var pageInternalAnnotIds = new List<List<int>>();
+        foreach (var page in _pages)
+        {
+            var internalIds = new List<int>();
+            foreach (var annot in page.InternalLinkAnnotations)
+            {
+                int annotId = nextId++;
+                double pdfX1 = annot.X;
+                double pdfY1 = page.Height - annot.Y - annot.Height;
+                double pdfX2 = annot.X + annot.Width;
+                double pdfY2 = page.Height - annot.Y;
+
+                int targetIdx = annot.PageNumber - 1;
+                if (targetIdx < 0 || targetIdx >= pageIds.Count)
+                    throw new InvalidOperationException($"Internal link targets page {annot.PageNumber}, but document has only {pageIds.Count} pages.");
+
+                int targetPageObjId = pageIds[targetIdx];
+                string destPart = annot.Top.HasValue
+                    ? $"/Dest [{targetPageObjId} 0 R /XYZ 0 {(_pages[targetIdx].Height - annot.Top.Value).ToString("F2", CultureInfo.InvariantCulture)} 0]"
+                    : $"/Dest [{targetPageObjId} 0 R /Fit]";
+
+                objects.Add((annotId,
+                    $"<< /Type /Annot /Subtype /Link " +
+                    $"/Rect [{Inv(pdfX1)} {Inv(pdfY1)} {Inv(pdfX2)} {Inv(pdfY2)}] " +
+                    $"/Border [0 0 0] " +
+                    $"{destPart} >>"));
+                internalIds.Add(annotId);
+            }
+            pageInternalAnnotIds.Add(internalIds);
+        }
+
+        // Page objects
+        for (int i = 0; i < _pages.Count; i++)
+        {
+            var p = _pages[i];
+            int pid = pageIds[i];
 
             // Build the /XObject sub-dictionary if this page has any images
             string xObjectDict = pageImageMaps[i].Count > 0
@@ -171,9 +229,10 @@ internal sealed class PdfDocument
                   " >> "
                 : string.Empty;
 
-            // Build the /Annots array if this page has any link annotations
-            string annotStr = pageAnnotIds[i].Count > 0
-                ? "/Annots [" + string.Join(" ", pageAnnotIds[i].Select(id => $"{id} 0 R")) + "] "
+            // Combine external and internal link annotations
+            var allAnnotIds = pageAnnotIds[i].Concat(pageInternalAnnotIds[i]).ToList();
+            string annotStr = allAnnotIds.Count > 0
+                ? "/Annots [" + string.Join(" ", allAnnotIds.Select(id => $"{id} 0 R")) + "] "
                 : string.Empty;
 
             objects.Add((pid,
@@ -191,18 +250,25 @@ internal sealed class PdfDocument
                 $">> {xObjectDict}>> >>"));
         }
 
-        // Pages dictionary
-        string kids = string.Join(" ", pageIds.Select(id => $"{id} 0 R"));
-        objects.Add((pagesId, $"<< /Type /Pages /Kids [{kids}] /Count {_pages.Count} >>"));
-
         // Outlines (bookmarks) - if any were defined
         int outlinesId = WriteBookmarks(ref nextId, objects, pageIds);
 
+        // Info dictionary - if any metadata was provided
+        int infoId = WriteInfoDictionary(ref nextId, objects);
+
         // Catalog - must be the last object so its id is known
         int catalogId = nextId++;
-        string catalogDict = outlinesId != 0
-            ? $"<< /Type /Catalog /Pages {pagesId} 0 R /Outlines {outlinesId} 0 R >>"
-            : $"<< /Type /Catalog /Pages {pagesId} 0 R >>";
+        var catalogParts = new List<string>
+        {
+            $"/Type /Catalog",
+            $"/Pages {pagesId} 0 R"
+        };
+        if (outlinesId != 0)
+            catalogParts.Add($"/Outlines {outlinesId} 0 R");
+        if (infoId != 0)
+            catalogParts.Add($"/Info {infoId} 0 R");
+
+        string catalogDict = $"<< {string.Join(" ", catalogParts)} >>";
         objects.Add((catalogId, catalogDict));
 
         // Merge text and binary objects into a single id-ordered list for xref
@@ -342,6 +408,39 @@ internal sealed class PdfDocument
         objects.Add((outlinesId, outlinesBody));
 
         return outlinesId;
+    }
+
+    /// <summary>
+    /// Generates the PDF Info dictionary if any metadata fields were set.
+    /// Returns the object ID, or 0 if no metadata.
+    /// </summary>
+    private int WriteInfoDictionary(ref int nextId, List<(int id, string body)> objects)
+    {
+        // Check if any metadata field is non-null
+        if (string.IsNullOrEmpty(_infoTitle) && string.IsNullOrEmpty(_infoAuthor) &&
+            string.IsNullOrEmpty(_infoSubject) && string.IsNullOrEmpty(_infoKeywords) &&
+            string.IsNullOrEmpty(_infoCreator))
+        {
+            return 0;
+        }
+
+        int infoId = nextId++;
+
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(_infoTitle))
+            parts.Add($"/Title ({Escape(_infoTitle)})");
+        if (!string.IsNullOrEmpty(_infoAuthor))
+            parts.Add($"/Author ({Escape(_infoAuthor)})");
+        if (!string.IsNullOrEmpty(_infoSubject))
+            parts.Add($"/Subject ({Escape(_infoSubject)})");
+        if (!string.IsNullOrEmpty(_infoKeywords))
+            parts.Add($"/Keywords ({Escape(_infoKeywords)})");
+        if (!string.IsNullOrEmpty(_infoCreator))
+            parts.Add($"/Creator ({Escape(_infoCreator)})");
+
+        string infoBody = "<< " + string.Join(" ", parts) + " >>";
+        objects.Add((infoId, infoBody));
+        return infoId;
     }
 
     /// <summary>

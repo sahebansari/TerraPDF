@@ -42,4 +42,41 @@ public interface IDocumentContainer
     /// <param name="parentTitle">The title of an existing bookmark to serve as parent.</param>
     /// <param name="top">Optional Y coordinate (in points from the top of the page).</param>
     void Bookmark(string title, int pageNumber, string parentTitle, double top);
+
+    // -- Table of Contents -----------------------------------------
+
+    /// <summary>
+    /// Adds a new page that will contain an automatically generated Table of Contents.
+    /// Headings added via <c>H1()</c>, <c>H2()</c>, etc. will be collected and listed.
+    /// The TOC page is placed in the document at the point where this method is called.
+    /// </summary>
+    /// <param name="configure">Optional configuration for the TOC page (size, margins, etc.).</param>
+    void TableOfContents(Action<PageDescriptor>? configure = null);
+
+    // -- Metadata ---------------------------------------------------
+
+    /// <summary>
+    /// Sets the document's Title metadata (displayed in PDF viewer's document properties).
+    /// </summary>
+    void MetadataTitle(string? title);
+
+    /// <summary>
+    /// Sets the document's Author metadata.
+    /// </summary>
+    void MetadataAuthor(string? author);
+
+    /// <summary>
+    /// Sets the document's Subject metadata.
+    /// </summary>
+    void MetadataSubject(string? subject);
+
+    /// <summary>
+    /// Sets the document's Keywords metadata (semicolon-separated or comma-separated tags).
+    /// </summary>
+    void MetadataKeywords(string? keywords);
+
+    /// <summary>
+    /// Sets the document's Creator metadata (software that generated the PDF).
+    /// </summary>
+    void MetadataCreator(string? creator);
 }

@@ -214,6 +214,27 @@ col.Item()
    .Text("Read the documentation").Underline().FontColor(Color.Blue.Darken2);
 ```
 
+---
+
+### Internal Link
+
+Creates a clickable internal link (GoTo action) that navigates to a specific page
+within the same PDF document. This is the mechanism used by the automatic Table
+of Contents feature to make entries clickable.
+
+```csharp
+// Jump to page 5, at the default vertical position (top of page)
+container.InternalLink(5).Text("See Chapter 5");
+
+// Jump to page 3 at a specific Y coordinate (e.g. 150 pt from top)
+container.InternalLink(3, 150).Text("Back to top");
+```
+
+Multiple internal links can be combined with other decorators. The target page
+must exist when the PDF is rendered; otherwise an `InvalidOperationException`
+is thrown during saving.
+
+---
 
 ### Horizontal alignment
 

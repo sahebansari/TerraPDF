@@ -2,6 +2,8 @@ using TerraPDF.Drawing;
 using TerraPDF.Elements;
 using TerraPDF.Helpers;
 using TerraPDF.Infra;
+using System.Linq;
+using System.Globalization;
 
 namespace TerraPDF.Core;
 
@@ -16,6 +18,18 @@ public sealed class DocumentComposer : IDocumentContainer
     private readonly List<BookmarkInfo> _bookmarks = new();
     private BookmarkInfo? _bookmarkRoot;  // First top-level bookmark (for tree building)
 
+    // Document metadata (PDF Info dictionary)
+    private string? _metadataTitle;
+    private string? _metadataAuthor;
+    private string? _metadataSubject;
+    private string? _metadataKeywords;
+    private string? _metadataCreator;
+
+    /// <summary>
+    /// Static recorder for heading elements during the first-pass render.
+    /// </summary>
+    internal static Action<HeadingElement, int, double>? CurrentHeadingRecorder { get; set; }
+
     // -- IDocumentContainer ----------------------------------------
 
     /// <inheritdoc/>
@@ -24,6 +38,19 @@ public sealed class DocumentComposer : IDocumentContainer
         ArgumentNullException.ThrowIfNull(configure);
         var descriptor = new PageDescriptor();
         configure(descriptor);
+        _pages.Add(descriptor);
+    }
+
+    // -- TableOfContents API ---------------------------------------
+
+    /// <inheritdoc/>
+    public void TableOfContents(Action<PageDescriptor>? configure = null)
+    {
+        if (_pages.Any(p => p.IsTableOfContents))
+            throw new InvalidOperationException("Only one Table of Contents page is allowed.");
+        var descriptor = new PageDescriptor();
+        configure?.Invoke(descriptor);
+        descriptor.IsTableOfContents = true;
         _pages.Add(descriptor);
     }
 
@@ -73,6 +100,38 @@ public sealed class DocumentComposer : IDocumentContainer
         var bm = new BookmarkInfo { Title = title, PageNumber = pageNumber, Top = top, Parent = parent };
         parent.Children.Add(bm);
         _bookmarks.Add(bm);
+    }
+
+    // -- Metadata API ------------------------------------------------
+
+    /// <inheritdoc/>
+    public void MetadataTitle(string? title)
+    {
+        _metadataTitle = string.IsNullOrWhiteSpace(title) ? null : title;
+    }
+
+    /// <inheritdoc/>
+    public void MetadataAuthor(string? author)
+    {
+        _metadataAuthor = string.IsNullOrWhiteSpace(author) ? null : author;
+    }
+
+    /// <inheritdoc/>
+    public void MetadataSubject(string? subject)
+    {
+        _metadataSubject = string.IsNullOrWhiteSpace(subject) ? null : subject;
+    }
+
+    /// <inheritdoc/>
+    public void MetadataKeywords(string? keywords)
+    {
+        _metadataKeywords = string.IsNullOrWhiteSpace(keywords) ? null : keywords;
+    }
+
+    /// <inheritdoc/>
+    public void MetadataCreator(string? creator)
+    {
+        _metadataCreator = string.IsNullOrWhiteSpace(creator) ? null : creator;
     }
 
     /// <summary>
@@ -127,28 +186,7 @@ public sealed class DocumentComposer : IDocumentContainer
         WriteTo(stream);
     }
 
-    // -- Rendering -------------------------------------------------
 
-    private void WriteTo(Stream output)
-    {
-        var doc = new PdfDocument();
-
-        // Measurement pass: count the total number of PDF pages that will be produced
-        int totalPages = _pages.Sum(CountPdfPages);
-
-        // Build bookmark tree and register all bookmarks with the PDF document
-        BookmarkInfo? bookmarkRoot = BuildBookmarkTree();
-        doc.SetBookmarks(_bookmarks, totalPages);
-
-        // Render pass: emit each descriptor, potentially spanning several PDF pages.
-        int pageNumber = 0;
-        foreach (var descriptor in _pages)
-            RenderDescriptor(doc, descriptor, ref pageNumber, totalPages);
-
-        doc.Save(output);
-    }
-
-    // ---------------------------------------------------------------
     // Measurement helpers
     // ---------------------------------------------------------------
 
@@ -569,7 +607,7 @@ public sealed class DocumentComposer : IDocumentContainer
         double contentX, double contentW,
         double headerH, double footerH,
         int pageNumber, int totalPages,
-        bool isFirstPage = true)
+        bool isFirstPage)
     {
         var pdfPage = doc.AddPage(d.PageWidth, d.PageHeight);
 
@@ -586,6 +624,7 @@ public sealed class DocumentComposer : IDocumentContainer
             Y                = 0,
             Width            = d.PageWidth,
             Height           = d.PageHeight,
+            HeadingRecorder  = CurrentHeadingRecorder,
         };
 
         // Draw header only on the first page when HeaderFirstPageOnly is set.
@@ -599,5 +638,207 @@ public sealed class DocumentComposer : IDocumentContainer
         }
 
         return ctx;
+    }
+
+    // ==============================================================
+    // Table of Contents support
+    // ==============================================================
+
+    private record HeadingInfo(int Level, string Title);
+
+    private sealed class TocEntry
+    {
+        public int Level { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public int PageNumber { get; set; }
+        public double Top { get; set; }
+    }
+
+    private static List<string> ComputeDisplayTitles(List<HeadingInfo> headings)
+    {
+        int[] counters = new int[6];
+        var display = new List<string>();
+        foreach (var h in headings)
+        {
+            counters[h.Level - 1]++;           // increment this level
+            for (int i = h.Level; i < 6; i++) // reset deeper levels
+                counters[i] = 0;
+
+            var parts = new List<string>();
+            for (int i = 0; i < h.Level; i++)
+                if (counters[i] > 0)
+                    parts.Add(counters[i].ToString(CultureInfo.InvariantCulture));
+
+            string number = string.Join(".", parts);
+            string title = $"{number} {h.Title}";
+            display.Add(title);
+        }
+        return display;
+    }
+
+    private static void ScanElement(Element? element, List<HeadingInfo> list)
+    {
+        if (element is HeadingElement h)
+        {
+            list.Add(new HeadingInfo(h.Level, h.Title));
+            return;
+        }
+
+        switch (element)
+        {
+            case Container c:
+                ScanElement(c.Child, list);
+                break;
+            case Column col:
+                foreach (var item in col.Items)
+                    ScanElement(item.Child, list);
+                break;
+            case Row row:
+                foreach (var item in row.Items)
+                    ScanElement(item.Slot.Child, list);
+                break;
+            case Table table:
+                foreach (var cell in table.Cells)
+                    ScanElement(cell.Slot.Child, list);
+                break;
+        }
+    }
+
+    private List<HeadingInfo> ScanAllHeadings()
+    {
+        var list = new List<HeadingInfo>();
+        foreach (var page in _pages)
+        {
+            ScanElement(page.ContentSlot.Child, list);
+        }
+        return list;
+    }
+
+    private static Column BuildPlaceholderTocColumn(List<HeadingInfo> headings, List<string> displayTitles)
+    {
+        var col = new Column();
+        col.Spacing = 4;
+        for (int i = 0; i < headings.Count; i++)
+        {
+            var h = headings[i];
+            string display = displayTitles[i];
+            var row = new Row();
+            var rd = new RowDescriptor(row);
+            var titleSlot = rd.AutoItem();
+            titleSlot.MarginLeft(20 * (h.Level - 1)).Text(display);
+            rd.ConstantItem(60).AlignRight().Text("0"); // placeholder page number
+            col.AddItem().Child = row;
+        }
+        return col;
+    }
+
+    private static Column BuildRealTocColumn(List<TocEntry> entries, List<string> displayTitles, int tocPageOffset)
+    {
+        var col = new Column();
+        col.Spacing = 4;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            string display = displayTitles[i];
+            var row = new Row();
+            var rd = new RowDescriptor(row);
+            var titleSlot = rd.AutoItem();
+            titleSlot.MarginLeft(20 * (entry.Level - 1)).Text(display);
+            int displayedPage = entry.PageNumber - tocPageOffset;
+            rd.ConstantItem(60).AlignRight().Text(displayedPage.ToString(CultureInfo.InvariantCulture));
+
+            var link = new InternalLinkElement
+            {
+                TargetPage = entry.PageNumber,
+                TargetTop = entry.Top
+            };
+            link.Inner.Child = row;
+            col.AddItem().Child = link;
+        }
+        return col;
+    }
+
+    // ==============================================================
+    // Output
+    // ==============================================================
+
+    private void WriteTo(Stream output)
+    {
+        // 1. Locate any TOC page(s)
+        var tocPageIndices = new List<int>();
+        for (int i = 0; i < _pages.Count; i++)
+        {
+            if (_pages[i].IsTableOfContents)
+                tocPageIndices.Add(i);
+        }
+
+        if (tocPageIndices.Count > 1)
+            throw new InvalidOperationException("Only one Table of Contents page is allowed.");
+
+        // 2. Scan all headings from content slots
+        var allHeadings = ScanAllHeadings();
+
+        // Compute hierarchical numbering for TOC display titles (e.g., "1.2.3 Title")
+        var displayTitles = ComputeDisplayTitles(allHeadings);
+
+        // 3. If TOC exists, create placeholder column and measure TOC page count
+        int tocPageCount = 0;
+        if (tocPageIndices.Count > 0)
+        {
+            var placeholder = BuildPlaceholderTocColumn(allHeadings, displayTitles);
+            _pages[tocPageIndices[0]].ContentSlot.Child = placeholder;
+
+            // Measure how many pages the TOC (with placeholder) will occupy.
+            // This count is used to offset displayed page numbers.
+            tocPageCount = CountPdfPages(_pages[tocPageIndices[0]]);
+        }
+
+        // 4. Compute total pages (with placeholder TOC)
+        int totalPages = _pages.Sum(CountPdfPages);
+
+        // 5. If TOC exists, perform dummy render to collect heading positions
+        List<TocEntry> collectedEntries = new();
+        if (tocPageIndices.Count > 0)
+        {
+            var dummyDoc = new PdfDocument();
+            DocumentComposer.CurrentHeadingRecorder = (h, pg, y) =>
+            {
+                collectedEntries.Add(new TocEntry
+                {
+                    Level = h.Level,
+                    Title = h.Title,
+                    PageNumber = pg,
+                    Top = y
+                });
+            };
+            int dummyPageNum = 0;
+            foreach (var desc in _pages)
+            {
+                RenderDescriptor(dummyDoc, desc, ref dummyPageNum, totalPages);
+            }
+            DocumentComposer.CurrentHeadingRecorder = null;
+
+            // Replace placeholder with real TOC, applying the page-number offset
+            var realToc = BuildRealTocColumn(collectedEntries, displayTitles, tocPageCount);
+            _pages[tocPageIndices[0]].ContentSlot.Child = realToc;
+
+            // Recompute total pages after real TOC
+            totalPages = _pages.Sum(CountPdfPages);
+        }
+
+        // 6. Create real document
+        var doc = new PdfDocument();
+        doc.SetMetadata(_metadataTitle, _metadataAuthor, _metadataSubject, _metadataKeywords, _metadataCreator);
+
+        BookmarkInfo? bookmarkRoot = BuildBookmarkTree();
+        doc.SetBookmarks(_bookmarks, totalPages);
+
+        int pageNumber = 0;
+        foreach (var descriptor in _pages)
+        {
+            RenderDescriptor(doc, descriptor, ref pageNumber, totalPages);
+        }
+
+        doc.Save(output);
     }
 }

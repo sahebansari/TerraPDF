@@ -531,6 +531,74 @@ public static class ContainerExtensions
         var element = new Link { Url = url };
         return container.SetAndReturnInner(element, element.Inner);
     }
+
+    // -- Headings --------------------------------------------------
+
+    /// <summary>Adds a level-1 heading (largest, bold). Suitable for document title or chapter titles.</summary>
+    public static TextDescriptor H1(this IContainer container, string text) => Heading(container, 1, text);
+
+    /// <summary>Adds a level-2 heading (large, bold).</summary>
+    public static TextDescriptor H2(this IContainer container, string text) => Heading(container, 2, text);
+
+    /// <summary>Adds a level-3 heading (medium, bold).</summary>
+    public static TextDescriptor H3(this IContainer container, string text) => Heading(container, 3, text);
+
+    /// <summary>Adds a level-4 heading (smaller, italic).</summary>
+    public static TextDescriptor H4(this IContainer container, string text) => Heading(container, 4, text);
+
+    /// <summary>Adds a level-5 heading (small, bold).</summary>
+    public static TextDescriptor H5(this IContainer container, string text) => Heading(container, 5, text);
+
+    /// <summary>Adds a level-6 heading (smallest, regular).</summary>
+    public static TextDescriptor H6(this IContainer container, string text) => Heading(container, 6, text);
+
+    private static TextDescriptor Heading(this IContainer container, int level, string text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        if (level < 1 || level > 6) throw new ArgumentOutOfRangeException(nameof(level), "Heading level must be between 1 and 6.");
+        var heading = new HeadingElement(level, text);
+        container.Slot().Child = heading;
+        var descriptor = new TextDescriptor(heading.TextBlock);
+        // Default styles per level
+        switch (level)
+        {
+            case 1:
+                descriptor.FontSize(24).Bold();
+                break;
+            case 2:
+                descriptor.FontSize(20).Bold();
+                break;
+            case 3:
+                descriptor.FontSize(16).Bold();
+                break;
+            case 4:
+                descriptor.FontSize(14).Italic();
+                break;
+            case 5:
+                descriptor.FontSize(12).Bold();
+                break;
+            case 6:
+                descriptor.FontSize(11);
+                break;
+        }
+        return descriptor;
+    }
+
+    // -- Internal link (GoTo) -------------------------------------
+
+    /// <summary>
+    /// Wraps child content in a clickable internal link that navigates to the specified page.
+    /// </summary>
+    /// <param name="container">The container slot to attach the link to.</param>
+    /// <param name="pageNumber">The 1-based target page number.</param>
+    /// <param name="top">Optional Y coordinate from the top of the page to position the view.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="pageNumber"/> is zero or negative.</exception>
+    public static IContainer InternalLink(this IContainer container, int pageNumber, double? top = null)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageNumber);
+        var element = new InternalLinkElement { TargetPage = pageNumber, TargetTop = top };
+        return container.SetAndReturnInner(element, element.Inner);
+    }
 }
 
 /// <summary>A no-op element used as a placeholder when content is hidden.</summary>

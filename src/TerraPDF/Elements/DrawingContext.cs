@@ -14,6 +14,7 @@ internal sealed class DrawingContext
     internal TextStyle DefaultTextStyle   { get; init; } = TextStyle.Default;
     internal int PageNumber               { get; init; } = 1;
     internal int TotalPages               { get; init; } = 1;
+    internal Action<HeadingElement, int, double>? HeadingRecorder { get; init; }
 
     /// <summary>Returns a context repositioned to the given bounds.</summary>
     internal DrawingContext At(double x, double y, double width, double height) => new()
@@ -26,5 +27,6 @@ internal sealed class DrawingContext
         DefaultTextStyle = DefaultTextStyle,
         PageNumber       = PageNumber,
         TotalPages       = TotalPages,
+        HeadingRecorder = HeadingRecorder,
     };
 }
