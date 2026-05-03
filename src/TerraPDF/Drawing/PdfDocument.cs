@@ -1,6 +1,9 @@
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
+using System.Collections.Generic;
+using System.Linq;
+using TerraPDF.Core;
 
 namespace TerraPDF.Drawing;
 
@@ -11,6 +14,20 @@ namespace TerraPDF.Drawing;
 internal sealed class PdfDocument
 {
     private readonly List<PdfPage> _pages = new();
+
+    // Bookmark (outline) data
+    private List<BookmarkInfo>? _allBookmarks; // all bookmark nodes
+    private int _totalLogicalPages;
+
+    /// <summary>
+    /// Associates a bookmark collection and the total logical page count with this document.
+    /// Called by DocumentComposer before rendering.
+    /// </summary>
+    internal void SetBookmarks(List<BookmarkInfo> allBookmarks, int totalLogicalPages)
+    {
+        _allBookmarks = allBookmarks;
+        _totalLogicalPages = totalLogicalPages;
+    }
 
     internal PdfPage AddPage(double widthPt, double heightPt)
     {
@@ -178,9 +195,15 @@ internal sealed class PdfDocument
         string kids = string.Join(" ", pageIds.Select(id => $"{id} 0 R"));
         objects.Add((pagesId, $"<< /Type /Pages /Kids [{kids}] /Count {_pages.Count} >>"));
 
+        // Outlines (bookmarks) - if any were defined
+        int outlinesId = WriteBookmarks(ref nextId, objects, pageIds);
+
         // Catalog - must be the last object so its id is known
         int catalogId = nextId++;
-        objects.Add((catalogId, $"<< /Type /Catalog /Pages {pagesId} 0 R >>"));
+        string catalogDict = outlinesId != 0
+            ? $"<< /Type /Catalog /Pages {pagesId} 0 R /Outlines {outlinesId} 0 R >>"
+            : $"<< /Type /Catalog /Pages {pagesId} 0 R >>";
+        objects.Add((catalogId, catalogDict));
 
         // Merge text and binary objects into a single id-ordered list for xref
         // Binary objects carry their raw stream bytes separately.
@@ -266,4 +289,123 @@ internal sealed class PdfDocument
         zlib.Dispose();
         return ms.ToArray();
     }
+
+    // ==============================================================
+    // Bookmarks / Outlines generation
+    // ==============================================================
+
+    /// <summary>
+    /// Generates the PDF outline tree (bookmarks) if any were defined.
+    /// Returns the object ID of the Outlines dictionary, or 0 if no bookmarks.
+    /// </summary>
+    private int WriteBookmarks(ref int nextId, List<(int id, string body)> objects, List<int> pageIds)
+    {
+        if (_allBookmarks == null || _allBookmarks.Count == 0)
+            return 0;
+
+        // Allocate an object ID for the Outlines dictionary itself
+        int outlinesId = nextId++;
+
+        // First pass: assign sequential IDs to every bookmark item.
+        foreach (var bm in _allBookmarks)
+        {
+            // (IDs assigned in WriteBookmarks loop)
+        }
+
+        // Build ID map and nodes list
+        var nodeToId = new Dictionary<BookmarkInfo, int>();
+        var nodesInOrder = new List<BookmarkInfo>();
+        foreach (var bm in _allBookmarks)
+        {
+            nodeToId[bm] = nextId++;  // assign next sequential ID
+            nodesInOrder.Add(bm);
+        }
+
+        // Second pass: create each bookmark item object in ascending ID order.
+        foreach (var node in nodesInOrder.OrderBy(n => nodeToId[n]))
+        {
+            int id = nodeToId[node];
+            string body = BuildBookmarkItemBody(node, nodeToId, pageIds, outlinesId);
+            objects.Add((id, body));
+        }
+
+        // Build the Outlines dictionary (root)
+        var topLevel = _allBookmarks.Where(b => b.Parent == null).ToList();
+        if (topLevel.Count == 0)
+            return 0; // Should not happen
+
+        int firstId = nodeToId[topLevel[0]];
+        int lastId = nodeToId[topLevel[^1]];
+        int totalCount = nodesInOrder.Count;
+
+        string outlinesBody = $"<< /Type /Outlines /First {firstId} 0 R /Last {lastId} 0 R /Count {totalCount} >>";
+        objects.Add((outlinesId, outlinesBody));
+
+        return outlinesId;
+    }
+
+    /// <summary>
+    /// Builds the PDF dictionary string for a single bookmark item.
+    /// </summary>
+    private static string BuildBookmarkItemBody(
+        BookmarkInfo node,
+        Dictionary<BookmarkInfo, int> idMap,
+        List<int> pageIds,
+        int outlinesRootId)
+    {
+        var parts = new List<string>
+        {
+            "/Type /Outlines",
+            $"/Title ({Escape(node.Title)})"
+        };
+
+        // Parent entry
+        if (node.Parent != null)
+            parts.Add($"/Parent {idMap[node.Parent]} 0 R");
+        else
+            parts.Add($"/Parent {outlinesRootId} 0 R");
+
+        // Sibling links
+        if (node.Prev != null) parts.Add($"/Prev {idMap[node.Prev]} 0 R");
+        if (node.Next != null) parts.Add($"/Next {idMap[node.Next]} 0 R");
+
+        // Children subtree (if any)
+        if (node.Children.Count > 0)
+        {
+            int firstChildId = idMap[node.Children[0]];
+            int lastChildId = idMap[node.Children[^1]];
+            parts.Add($"/First {firstChildId} 0 R");
+            parts.Add($"/Last {lastChildId} 0 R");
+            parts.Add($"/Count {node.Children.Count}");
+        }
+
+        // Destination
+        int pageIdx = node.PageNumber - 1;
+        if (pageIdx < 0 || pageIdx >= pageIds.Count)
+            throw new InvalidOperationException($"Bookmark '{node.Title}' targets page {node.PageNumber} but document has only {pageIds.Count} pages.");
+
+        int pageObjId = pageIds[pageIdx];
+
+        if (node.Top.HasValue)
+        {
+            // /FitH: fit width, set top edge at specified Y from top of page
+            double top = node.Top.Value;
+            string topStr = top.ToString("F2", CultureInfo.InvariantCulture);
+            parts.Add($"/Dest [{pageObjId} 0 R /FitH {topStr}]");
+        }
+        else
+        {
+            parts.Add($"/Dest [{pageObjId} 0 R /Fit]");
+        }
+
+        return "<< " + string.Join(" ", parts) + " >>";
+    }
+
+    /// <summary>
+    /// Escapes special characters in a PDF string literal (backslash, parentheses).
+    /// </summary>
+    private static string Escape(string s) =>
+        s.Replace("\\", "\\\\")
+         .Replace("(", "\\(")
+         .Replace(")", "\\)");
 }

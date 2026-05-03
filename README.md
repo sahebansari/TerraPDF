@@ -1,6 +1,9 @@
-# TerraPDF - A free, pure C# library designed for fast and reliable PDF generation.
+# TerraPDF 
+
+A free, pure C# library designed for fast and reliable PDF generation.
 
 ![TerraPDF](https://github.com/sahebansari/TerraPDF/raw/master/logo.png)
+
 [![NuGet](https://img.shields.io/nuget/v/TerraPDF.svg)](https://www.nuget.org/packages/TerraPDF)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -26,6 +29,7 @@ runtime packages, and no licensing restrictions.
 - Horizontal and vertical rule lines
 - Explicit page breaks via `PageBreak()`
 - Clickable hyperlink (URI) annotations via `Hyperlink()`
+- PDF bookmarks / outlines with hierarchical nesting
 - Conditional rendering via `ShowIf`
 - Reusable components via `IComponent`
 - Headers, footers, and page numbers

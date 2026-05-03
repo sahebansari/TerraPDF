@@ -13,6 +13,9 @@ public sealed class DocumentComposer : IDocumentContainer
 {
     private readonly List<PageDescriptor> _pages = [];
 
+    private readonly List<BookmarkInfo> _bookmarks = new();
+    private BookmarkInfo? _bookmarkRoot;  // First top-level bookmark (for tree building)
+
     // -- IDocumentContainer ----------------------------------------
 
     /// <inheritdoc/>
@@ -22,6 +25,79 @@ public sealed class DocumentComposer : IDocumentContainer
         var descriptor = new PageDescriptor();
         configure(descriptor);
         _pages.Add(descriptor);
+    }
+
+    // -- Bookmark API ----------------------------------------------
+
+    /// <inheritdoc/>
+    public void Bookmark(string title, int pageNumber)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageNumber);
+        var bm = new BookmarkInfo { Title = title, PageNumber = pageNumber };
+        _bookmarks.Add(bm);
+    }
+
+    /// <inheritdoc/>
+    public void Bookmark(string title, int pageNumber, double top)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageNumber);
+        ArgumentOutOfRangeException.ThrowIfNegative(top);
+        var bm = new BookmarkInfo { Title = title, PageNumber = pageNumber, Top = top };
+        _bookmarks.Add(bm);
+    }
+
+    /// <inheritdoc/>
+    public void Bookmark(string title, int pageNumber, string parentTitle)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(parentTitle);
+
+        var parent = _bookmarks.LastOrDefault(b => b.Title == parentTitle) ?? throw new InvalidOperationException($"Parent bookmark '{parentTitle}' not found.");
+        var bm = new BookmarkInfo { Title = title, PageNumber = pageNumber, Parent = parent };
+        parent.Children.Add(bm);
+        _bookmarks.Add(bm);
+    }
+
+    /// <inheritdoc/>
+    public void Bookmark(string title, int pageNumber, string parentTitle, double top)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(parentTitle);
+        ArgumentOutOfRangeException.ThrowIfNegative(top);
+
+        var parent = _bookmarks.LastOrDefault(b => b.Title == parentTitle) ?? throw new InvalidOperationException($"Parent bookmark '{parentTitle}' not found.");
+        var bm = new BookmarkInfo { Title = title, PageNumber = pageNumber, Top = top, Parent = parent };
+        parent.Children.Add(bm);
+        _bookmarks.Add(bm);
+    }
+
+    /// <summary>
+    /// Builds the hierarchical bookmark tree structure after all bookmarks
+    /// have been added. Establishes sibling links among all children within each parent.
+    /// </summary>
+    private BookmarkInfo? BuildBookmarkTree()
+    {
+        if (_bookmarks.Count == 0)
+            return null;
+
+        // Link siblings for every parent (including top-level where Parent is null)
+        foreach (var group in _bookmarks.GroupBy(b => b.Parent))
+        {
+            var siblings = group.ToList();
+            for (int i = 0; i < siblings.Count; i++)
+            {
+                if (i > 0) siblings[i].Prev = siblings[i - 1];
+                if (i < siblings.Count - 1) siblings[i].Next = siblings[i + 1];
+            }
+        }
+
+        // Top-level (no parent) entries form the root's children
+        _bookmarkRoot = _bookmarks.FirstOrDefault(b => b.Parent is null);
+        return _bookmarkRoot;
     }
 
     // -- Output ----------------------------------------------------
@@ -58,8 +134,11 @@ public sealed class DocumentComposer : IDocumentContainer
         var doc = new PdfDocument();
 
         // Measurement pass: count the total number of PDF pages that will be produced
-        // across all descriptors so that page-number spans show the correct total.
         int totalPages = _pages.Sum(CountPdfPages);
+
+        // Build bookmark tree and register all bookmarks with the PDF document
+        BookmarkInfo? bookmarkRoot = BuildBookmarkTree();
+        doc.SetBookmarks(_bookmarks, totalPages);
 
         // Render pass: emit each descriptor, potentially spanning several PDF pages.
         int pageNumber = 0;
