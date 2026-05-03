@@ -72,6 +72,11 @@
         <PackagePath>\</PackagePath>
       </None>
     </ItemGroup>
+    <ItemGroup>
+      <None Update="logo.png">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
 
 </Project>
 

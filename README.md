@@ -1,7 +1,6 @@
-# TerraPDF
+# TerraPDF - A free, pure C# library designed for fast and reliable PDF generation.
 
-![TerraPDF Logo](logo.png)
-
+![TerraPDF](https://github.com/sahebansari/TerraPDF/raw/master/logo.png)
 [![NuGet](https://img.shields.io/nuget/v/TerraPDF.svg)](https://www.nuget.org/packages/TerraPDF)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
