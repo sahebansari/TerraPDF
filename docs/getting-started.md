@@ -122,6 +122,7 @@ composer.PublishPdf(stream);
 - [Decorators](decorators.md) — Padding, Margin, Background, Border, Rounded Border, Per-Edge Borders, Alignment, Lines, PageBreak, Hyperlink, ShowIf
 - [Vector Graphics](vector-graphics.md) — Canvas API, lines, shapes, Bézier paths, polygons, grids, charts
 - [Images](images.md) — PNG and JPEG embedding
+- [Encryption](encryption.md) — AES-128 password protection and permission flags
 - [Table of Contents](table-of-contents.md) — headings, automatic TOC generation, internal links
 - [Bookmarks](bookmarks.md) — PDF outlines / hierarchical navigation tree
 - [Unicode & Character Encoding](unicode-and-encoding.md) — WinAnsiEncoding coverage, Windows-1252 specials, Latin-1 Supplement, avoiding `?` characters

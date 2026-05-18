@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,6 +28,10 @@ internal sealed class PdfDocument
     private string? _infoKeywords;
     private string? _infoCreator;
 
+    // Encryption
+    private PdfEncryption? _encryption;
+    private EncryptionOptions? _encryptionOptions;
+
     /// <summary>
     /// Associates a bookmark collection and the total logical page count with this document.
     /// Called by DocumentComposer before rendering.
@@ -47,6 +52,17 @@ internal sealed class PdfDocument
         _infoSubject  = subject;
         _infoKeywords = keywords;
         _infoCreator  = creator;
+    }
+
+    /// <summary>
+    /// Enables AES-128 encryption for the document.
+    /// Must be called before <see cref="Save"/> to take effect.
+    /// </summary>
+    internal void SetEncryption(EncryptionOptions options)
+    {
+        _encryptionOptions = options;
+        // PdfEncryption is created in Save() once the random fileId is available.
+        _encryption = null;
     }
 
     internal PdfPage AddPage(double widthPt, double heightPt)
@@ -92,6 +108,19 @@ internal sealed class PdfDocument
         objects.Add((f5Id, "<< /Type /Font /Subtype /Type1 /BaseFont /Times-BoldItalic /Encoding /WinAnsiEncoding >>"));
         objects.Add((f6Id, "<< /Type /Font /Subtype /Type1 /BaseFont /Times-Italic /Encoding /WinAnsiEncoding >>"));
 
+        // Generate file ID and initialise encryption now that options are available.
+        // The file ID must be the same value used in key derivation AND written to /ID.
+        // PDF spec §7.6.3.3 step c requires the first element of the /ID array in the
+        // key-derivation hash — so it must be fixed before any encryption happens.
+        byte[]? fileId     = null;
+        string  fileIdHex  = string.Empty;
+        if (_encryptionOptions is not null)
+        {
+            fileId    = RandomNumberGenerator.GetBytes(16);
+            fileIdHex = BytesToHexString(fileId);
+            _encryption = new PdfEncryption(_encryptionOptions, fileId);
+        }
+
         // Image XObjects - one PDF object per unique alias per page.
         // We build per-page maps of alias -> object id for use in /Resources.
         var pageImageMaps = new List<Dictionary<string, int>>();
@@ -105,49 +134,65 @@ internal sealed class PdfDocument
 
                 if (img.IsJpeg)
                 {
-                    // JPEG: embed raw file bytes verbatim - PDF's DCTDecode filter handles decompression.
-                    // ColorSpace depends on component count: 1=grayscale, 3=RGB/YCbCr, 4=CMYK.
                     string cs = img.Components switch
                     {
                         1 => "/DeviceGray",
                         4 => "/DeviceCMYK",
                         _ => "/DeviceRGB",
                     };
+                    byte[] imgData = _encryption is not null
+                        ? _encryption.EncryptBytes(img.Data, imgId, 0)
+                        : img.Data;
                     string dict =
                         $"<< /Type /XObject /Subtype /Image " +
                         $"/Width {img.Width} /Height {img.Height} " +
                         $"/ColorSpace {cs} /BitsPerComponent 8 " +
-                        $"/Filter /DCTDecode /Length {img.Data.Length} >>";
-                    binaryObjects.Add((imgId, dict, img.Data));
+                        $"/Filter /DCTDecode /Length {imgData.Length} >>";
+                    binaryObjects.Add((imgId, dict, imgData));
                 }
                 else
                 {
-                    // PNG: compress decoded RGB pixels with zlib (FlateDecode)
                     byte[] compressed = Compress(img.Data);
+                    byte[] imgData = _encryption is not null
+                        ? _encryption.EncryptBytes(compressed, imgId, 0)
+                        : compressed;
                     string dict =
                         $"<< /Type /XObject /Subtype /Image " +
                         $"/Width {img.Width} /Height {img.Height} " +
                         $"/ColorSpace /DeviceRGB /BitsPerComponent 8 " +
-                        $"/Filter /FlateDecode /Length {compressed.Length} >>";
-                    binaryObjects.Add((imgId, dict, compressed));
+                        $"/Filter /FlateDecode /Length {imgData.Length} >>";
+                    binaryObjects.Add((imgId, dict, imgData));
                 }
             }
             pageImageMaps.Add(imgMap);
         }
 
         // Content streams (one per page)
+        // When encrypted, the content stream is stored as a binary object.
         var contentIds = new List<int>();
-        foreach (var page in _pages)
+        for (int pi = 0; pi < _pages.Count; pi++)
         {
+            var page = _pages[pi];
             string ops = page.BuildContentStream();
-            int len    = enc.GetByteCount(ops);
             int cid    = nextId++;
             contentIds.Add(cid);
-            objects.Add((cid, $"<< /Length {len} >>\nstream\n{ops}\nendstream"));
+
+            if (_encryption is not null)
+            {
+                // Encrypt the raw content stream bytes
+                byte[] plainBytes      = enc.GetBytes(ops);
+                byte[] encryptedStream = _encryption.EncryptBytes(plainBytes, cid, 0);
+                string dict = $"<< /Length {encryptedStream.Length} >>";
+                binaryObjects.Add((cid, dict, encryptedStream));
+            }
+            else
+            {
+                int len = enc.GetByteCount(ops);
+                objects.Add((cid, $"<< /Length {len} >>\nstream\n{ops}\nendstream"));
+            }
         }
 
-        // Link annotation objects (one PDF object per annotation, grouped per page).
-        // Annotations reference the page they belong to via the page dict /Annots array.
+        // Link annotation objects
         var pageAnnotIds = new List<List<int>>();
         foreach (var page in _pages)
         {
@@ -155,12 +200,10 @@ internal sealed class PdfDocument
             foreach (var annot in page.LinkAnnotations)
             {
                 int annotId = nextId++;
-                // Convert from top-left origin to PDF bottom-left origin
                 double pdfX1 = annot.X;
                 double pdfY1 = page.Height - annot.Y - annot.Height;
                 double pdfX2 = annot.X + annot.Width;
                 double pdfY2 = page.Height - annot.Y;
-                // Escape parentheses and backslashes inside the URI PDF string literal
                 string uri = annot.Url.Replace("\\", "\\\\").Replace("(", "\\(").Replace(")", "\\)");
                 objects.Add((annotId,
                     $"<< /Type /Annot /Subtype /Link " +
@@ -176,11 +219,8 @@ internal sealed class PdfDocument
         int pagesId = nextId++;
         var pageIds = new List<int>();
         for (int i = 0; i < _pages.Count; i++)
-        {
             pageIds.Add(nextId++);
-        }
 
-        // Create Pages dictionary object (references page IDs)
         string kids = string.Join(" ", pageIds.Select(id => $"{id} 0 R"));
         objects.Add((pagesId, $"<< /Type /Pages /Kids [{kids}] /Count {_pages.Count} >>"));
 
@@ -219,17 +259,15 @@ internal sealed class PdfDocument
         // Page objects
         for (int i = 0; i < _pages.Count; i++)
         {
-            var p = _pages[i];
+            var p   = _pages[i];
             int pid = pageIds[i];
 
-            // Build the /XObject sub-dictionary if this page has any images
             string xObjectDict = pageImageMaps[i].Count > 0
                 ? "/XObject << " +
                   string.Join(" ", pageImageMaps[i].Select(kv => $"/{kv.Key} {kv.Value} 0 R")) +
                   " >> "
                 : string.Empty;
 
-            // Combine external and internal link annotations
             var allAnnotIds = pageAnnotIds[i].Concat(pageInternalAnnotIds[i]).ToList();
             string annotStr = allAnnotIds.Count > 0
                 ? "/Annots [" + string.Join(" ", allAnnotIds.Select(id => $"{id} 0 R")) + "] "
@@ -250,13 +288,16 @@ internal sealed class PdfDocument
                 $">> {xObjectDict}>> >>"));
         }
 
-        // Outlines (bookmarks) - if any were defined
+        // Outlines (bookmarks)
         int outlinesId = WriteBookmarks(ref nextId, objects, pageIds);
 
-        // Info dictionary - if any metadata was provided
+        // Info dictionary
         int infoId = WriteInfoDictionary(ref nextId, objects);
 
-        // Catalog - must be the last object so its id is known
+        // Encrypt dictionary (if encryption is enabled)
+        int encryptId = WriteEncryptDictionary(ref nextId, objects);
+
+        // Catalog
         int catalogId = nextId++;
         var catalogParts = new List<string>
         {
@@ -271,21 +312,20 @@ internal sealed class PdfDocument
         string catalogDict = $"<< {string.Join(" ", catalogParts)} >>";
         objects.Add((catalogId, catalogDict));
 
-        // Merge text and binary objects into a single id-ordered list for xref
-        // Binary objects carry their raw stream bytes separately.
+        // Sort for xref
         objects.Sort((a, b) => a.id.CompareTo(b.id));
         binaryObjects.Sort((a, b) => a.id.CompareTo(b.id));
 
         // -- Write header ------------------------------------------
-        WriteStr("%PDF-1.7\n");
-        // Comment with high-byte characters signals that the file is binary
+        // AES-128 encryption requires PDF 1.6+; use 1.7 for unencrypted documents.
+        string pdfVersion = _encryptionOptions is not null ? "%PDF-1.6\n" : "%PDF-1.7\n";
+        WriteStr(pdfVersion);
         ms.Write(new byte[] { (byte)'%', 0xE2, 0xE3, 0xCF, 0xD3, (byte)'\n' });
 
-        // -- Write body objects, recording byte offsets -------------
-        // We interleave text and binary objects in ascending id order.
-        var offsets   = new Dictionary<int, long>();
-        int txtIndex  = 0;
-        int binIndex  = 0;
+        // -- Write body objects ------------------------------------
+        var offsets  = new Dictionary<int, long>();
+        int txtIndex = 0;
+        int binIndex = 0;
 
         while (txtIndex < objects.Count || binIndex < binaryObjects.Count)
         {
@@ -299,7 +339,7 @@ internal sealed class PdfDocument
                 var (id, dict, stream) = binaryObjects[binIndex++];
                 offsets[id] = ms.Position;
                 WriteStr($"{id} 0 obj\n{dict}\nstream\n");
-                ms.Write(stream);                      // raw compressed bytes
+                ms.Write(stream);
                 WriteStr("\nendstream\nendobj\n");
             }
             else
@@ -310,51 +350,48 @@ internal sealed class PdfDocument
             }
         }
 
-        // Total object count for xref = text objects + binary objects + free entry (obj 0)
         int totalCount = objects.Count + binaryObjects.Count + 1;
 
-        // -- Cross-reference table ----------------------------------
-        // Each entry is exactly 20 bytes:
-        //   nnnnnnnnnn(10) SP(1) ggggg(5) SP(1) [n|f](1) SP(1) LF(1) = 20
+        // -- Cross-reference table ---------------------------------
         long xrefOffset = ms.Position;
-
         WriteStr("xref\n");
         WriteStr($"0 {totalCount}\n");
-        WriteStr("0000000000 65535 f \n"); // free-list head (object 0)
-
+        WriteStr("0000000000 65535 f \n");
         for (int i = 1; i < totalCount; i++)
             WriteStr($"{offsets[i]:D10} 00000 n \n");
 
         // -- Trailer -----------------------------------------------
         WriteStr("trailer\n");
-        WriteStr($"<< /Size {totalCount} /Root {catalogId} 0 R >>\n");
+        if (encryptId != 0)
+            WriteStr($"<< /Size {totalCount} /Root {catalogId} 0 R /Encrypt {encryptId} 0 R /ID [{fileIdHex} {fileIdHex}] >>\n");
+        else
+            WriteStr($"<< /Size {totalCount} /Root {catalogId} 0 R >>\n");
         WriteStr("startxref\n");
         WriteStr($"{xrefOffset}\n");
         WriteStr("%%EOF\n");
 
-        // -- Flush to caller's stream ------------------------------
         ms.Position = 0;
         ms.CopyTo(output);
     }
 
-    // --------------------------------------------------------------
-    //  Helpers
-    // --------------------------------------------------------------
+        // --------------------------------------------------------------
+        //  Helpers
+        // --------------------------------------------------------------
 
-    // Formats a page dimension for the /MediaBox array using invariant culture
-    private static string Inv(double d) =>
-        d.ToString("F2", CultureInfo.InvariantCulture);
+        // Formats a page dimension for the /MediaBox array using invariant culture
+        private static string Inv(double d) =>
+            d.ToString("F2", CultureInfo.InvariantCulture);
 
-    // Compresses raw bytes using zlib/deflate (FlateDecode in PDF terms)
-    private static byte[] Compress(byte[] data)
-    {
-        using var ms   = new MemoryStream();
-        using var zlib = new ZLibStream(ms, CompressionLevel.Optimal);
-        zlib.Write(data, 0, data.Length);
-        zlib.Flush();
-        zlib.Dispose();
-        return ms.ToArray();
-    }
+        // Compresses raw bytes using zlib/deflate (FlateDecode in PDF terms)
+        private static byte[] Compress(byte[] data)
+        {
+            using var ms   = new MemoryStream();
+            using var zlib = new ZLibStream(ms, CompressionLevel.Optimal);
+            zlib.Write(data, 0, data.Length);
+            zlib.Flush();
+            zlib.Dispose();
+            return ms.ToArray();
+        }
 
     // ==============================================================
     // Bookmarks / Outlines generation
@@ -441,6 +478,56 @@ internal sealed class PdfDocument
         string infoBody = "<< " + string.Join(" ", parts) + " >>";
         objects.Add((infoId, infoBody));
         return infoId;
+    }
+
+    /// <summary>
+    /// Generates the PDF Standard Security Handler /Encrypt dictionary (Rev 4, AES-128).
+    /// Returns the object ID, or 0 if encryption is not configured.
+    /// The /Encrypt object is referenced from the trailer, NOT from the catalog,
+    /// and is itself NOT encrypted (per PDF spec §7.6.1).
+    /// </summary>
+    private int WriteEncryptDictionary(ref int nextId, List<(int id, string body)> objects)
+    {
+        if (_encryption is null)
+            return 0;
+
+        int encId = nextId++;
+
+        // Convert O and U entries to PDF hex strings
+        string oHex = BytesToHexString(_encryption.OEntry);
+        string uHex = BytesToHexString(_encryption.UEntry);
+
+        // Standard Security Handler Rev 4, AES-128
+        // /CF defines the crypt filter "StdCF" that uses AES-128 (/AESV2)
+        // /StmF and /StrF reference StdCF for all streams and strings
+        string body =
+            "<< " +
+            "/Filter /Standard " +
+            "/V 4 " +               // Algorithm 4 (CF-based)
+            "/R 4 " +               // Revision 4
+            "/Length 128 " +        // Key length in bits
+            $"/P {_encryption.PEntry} " +
+            $"/O {oHex} " +
+            $"/U {uHex} " +
+            "/CF << /StdCF << /AuthEvent /DocOpen /CFM /AESV2 /Length 16 >> >> " +
+            "/StmF /StdCF " +       // all streams use StdCF
+            "/StrF /StdCF " +       // all strings use StdCF
+            "/EncryptMetadata true " +
+            ">>";
+
+        objects.Add((encId, body));
+        return encId;
+    }
+
+    /// <summary>Converts a byte array to a PDF hex string token, e.g. &lt;AABBCC…&gt;.</summary>
+    private static string BytesToHexString(byte[] bytes)
+    {
+        var sb = new StringBuilder(bytes.Length * 2 + 2);
+        sb.Append('<');
+        foreach (byte b in bytes)
+            sb.Append(b.ToString("X2", CultureInfo.InvariantCulture));
+        sb.Append('>');
+        return sb.ToString();
     }
 
     /// <summary>

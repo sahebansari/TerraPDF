@@ -6,7 +6,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.2.3] - 2026-05-18
+## [1.3.0] - 2026-05-19
+
+### Added
+- **AES-128 PDF Encryption**
+  documents with the PDF Standard Security Handler (Revision 4, AES-128 CBC).
+  - `UserPassword` — password required to open the document (omit for no-password encryption).
+  - `OwnerPassword` — password granting full access, bypassing all restrictions.
+  - `Permissions` — `PdfPermissions` flags enum controlling print, copy, edit, fill forms, etc.
+  - `PdfPermissions` — `[Flags]` enum with `Print`, `CopyText`, `ModifyContents`,
+    `ModifyAnnotations`, `FillForms`, `ExtractForAccessibility`, `AssembleDocument`,
+    `PrintLowResolution`, `All`, `None`.
+  - Per-object AES-128 CBC encryption of all content streams and image XObjects.
+  - Standard /O and /U verifier entries computed via the PDF key-derivation algorithms
+    (MD5 key expansion + RC4 for O/U; AES-128 for content).
+  - Encrypted documents are emitted as PDF 1.6 (minimum required for AES).
+  - No external packages — implemented entirely with `System.Security.Cryptography`.
+      `EncryptionTests.cs` — 26 tests covering all password combinations, every permission
+      flag, multi-page documents, metadata + encryption, null-guard, and output-size sanity.
+
+  ### Fixed
+  - **Incorrect password error** — encrypted PDFs now correctly write the random `/ID` array
+    to the PDF trailer and pass it into all key-derivation steps, so viewers can reproduce
+    the exact file encryption key.
+  - **"Error on this page"** — removed spurious `/Filter /Crypt` from content streams and
+    JPEG image dictionaries; encryption is transparent to stream filters per PDF §7.6.1.
+  - **Corrupted decrypted content** — `EncryptBytes` now uses PKCS#7 padding instead of
+    zero-padding so viewers can correctly strip the padding block after AES-128 CBC decryption.
+  - **`SamplePDF` folder** — sample project now calls `Directory.CreateDirectory` at startup
+    so the output folder is always created automatically if it does not already exist.
+  - **Tick/cross badges** — `EncryptionShowcase` permission badges replaced `✓`/`✗`
+    (U+2713/U+2717, outside WinAnsi) with ASCII `+`/`x` to prevent `?` rendering.
+
+  ---
+
+  ## [1.2.3]
 
 ### Added
 - **Vector Graphics / Canvas API** — `container.Canvas(height, draw)` places a

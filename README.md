@@ -40,7 +40,8 @@ runtime packages, and no licensing restrictions.
  - Conditional rendering via `ShowIf`
  - Reusable components via `IComponent`
  - Headers, footers, and page numbers
- - Full **WinAnsiEncoding** character coverage — Latin-1 Supplement (U+00A0–U+00FF) and all 27 Windows-1252 typographic specials (€ ™ ‘ ’ “ ” – — … •) with exact Adobe AFM glyph widths
+ - **AES-128 PDF encryption** — user password, owner password, and fine-grained permission flags (`PdfPermissions`) via `container.Encrypt()`
+ - Full **WinAnsiEncoding** character coverage
  - **Vector graphics canvas** — lines, rectangles, rounded rectangles, circles, ellipses, arbitrary Bézier paths, polygons, and grid helpers via `container.Canvas()`
  - Fluent, composable API
 
@@ -348,6 +349,44 @@ container.LineVertical(1)                   // vertical rule (black)
 ```csharp
 container.ShowIf(isAdmin).Text("Admin panel");
 ```
+
+---
+
+## Encryption & Password Protection
+
+Protect any document with AES-128 and the PDF Standard Security Handler (Rev 4):
+
+```csharp
+Document.Create(container =>
+{
+    container.Encrypt(new EncryptionOptions
+    {
+        UserPassword  = "open123",    // required to open the document
+        OwnerPassword = "admin456",   // full access, bypasses permissions
+        Permissions   = PdfPermissions.Print | PdfPermissions.CopyText,
+    });
+
+    container.Page(page => { /* … */ });
+})
+.PublishPdf("protected.pdf");
+```
+
+### Permission flags
+
+| Flag | Description |
+|------|-------------|
+| `PdfPermissions.Print` | High-quality printing |
+| `PdfPermissions.CopyText` | Copy or extract text |
+| `PdfPermissions.ModifyContents` | Edit document contents |
+| `PdfPermissions.ModifyAnnotations` | Add/modify annotations |
+| `PdfPermissions.FillForms` | Fill interactive form fields |
+| `PdfPermissions.ExtractForAccessibility` | Screen-reader text extraction |
+| `PdfPermissions.AssembleDocument` | Insert/rotate/delete pages |
+| `PdfPermissions.PrintLowResolution` | Low-quality printing only |
+| `PdfPermissions.All` | All permissions (default) |
+| `PdfPermissions.None` | No permissions — view only |
+
+See [docs/encryption.md](docs/encryption.md) for the full reference.
 
 ---
 

@@ -5,6 +5,9 @@ using TerraPDF.Sample.Samples;
 
 
 string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+string sampleDir = Path.Combine(desktop, "SamplePDF");
+Directory.CreateDirectory(sampleDir);
+
 string imgDir    = AppContext.BaseDirectory;          // images live next to the exe
 string headerImg = Path.Combine(imgDir, "header_logo.png");
 string smallImg  = Path.Combine(imgDir, "small_logo.jpg");
@@ -12,17 +15,18 @@ string smallImg  = Path.Combine(imgDir, "small_logo.jpg");
 Console.WriteLine("TerraPDF Samples - generating ten PDFs to Desktop...");
 Console.WriteLine();
 
-SimpleReport.Generate(Path.Combine(desktop, "SamplePDF", "01_simple_report.pdf"));
-StyledNewsletter.Generate(Path.Combine(desktop, "SamplePDF", "02_newsletter.pdf"));
-Invoice.Generate(Path.Combine(desktop, "SamplePDF", "03_invoice.pdf"));
-CompanyProfile.Generate(Path.Combine(desktop, "SamplePDF", "04_company_profile.pdf"), headerImg, smallImg);
-EventBrochure.Generate(Path.Combine(desktop, "SamplePDF", "05_event_brochure.pdf"), headerImg, smallImg);
-ProductCatalogue.Generate(Path.Combine(desktop, "SamplePDF", "06_product_catalogue.pdf"), headerImg, smallImg);
-ProductCatalogCover.Generate(Path.Combine(desktop, "SamplePDF", "07_product_catalog_cover.pdf"), smallImg);
-ReportWithBookmarks.Generate(Path.Combine(desktop, "SamplePDF", "08_report_with_bookmarks.pdf"));
-ReportWithTocSample.Generate(Path.Combine(desktop, "SamplePDF", "09_report_with_toc.pdf"));
-VectorGraphicsShowcase.Generate(Path.Combine(desktop, "SamplePDF", "10_vector_graphics_showcase.pdf"));
-UnicodeShowcase.Generate(Path.Combine(desktop, "SamplePDF", "11_unicode_showcase.pdf"));
+SimpleReport.Generate(Path.Combine(sampleDir, "01_simple_report.pdf"));
+StyledNewsletter.Generate(Path.Combine(sampleDir, "02_newsletter.pdf"));
+Invoice.Generate(Path.Combine(sampleDir, "03_invoice.pdf"));
+CompanyProfile.Generate(Path.Combine(sampleDir, "04_company_profile.pdf"), headerImg, smallImg);
+EventBrochure.Generate(Path.Combine(sampleDir, "05_event_brochure.pdf"), headerImg, smallImg);
+ProductCatalogue.Generate(Path.Combine(sampleDir, "06_product_catalogue.pdf"), headerImg, smallImg);
+ProductCatalogCover.Generate(Path.Combine(sampleDir, "07_product_catalog_cover.pdf"), smallImg);
+ReportWithBookmarks.Generate(Path.Combine(sampleDir, "08_report_with_bookmarks.pdf"));
+ReportWithTocSample.Generate(Path.Combine(sampleDir, "09_report_with_toc.pdf"));
+VectorGraphicsShowcase.Generate(Path.Combine(sampleDir, "10_vector_graphics_showcase.pdf"));
+UnicodeShowcase.Generate(Path.Combine(sampleDir, "11_unicode_showcase.pdf"));
+EncryptionShowcase.Generate(Path.Combine(sampleDir, "12_encryption_showcase.pdf"));
 
 Console.WriteLine();
 Console.WriteLine("Done.");

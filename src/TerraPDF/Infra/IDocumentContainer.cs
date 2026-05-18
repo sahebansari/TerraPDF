@@ -79,4 +79,23 @@ public interface IDocumentContainer
     /// Sets the document's Creator metadata (software that generated the PDF).
     /// </summary>
     void MetadataCreator(string? creator);
+
+    // -- Encryption -------------------------------------------------
+
+    /// <summary>
+    /// Enables AES-128 password protection for the document.
+    /// </summary>
+    /// <param name="options">
+    /// Encryption settings: user password (to open), owner password (full access),
+    /// and permission flags.  Must not be <c>null</c>.
+    /// </param>
+    /// <remarks>
+    /// Call this once before adding pages.  Calling it more than once replaces the
+    /// previous settings.  When a <see cref="TerraPDF.Core.EncryptionOptions.UserPassword"/>
+    /// is set, the PDF viewer will prompt for the password before displaying the document.
+    /// When it is empty or <c>null</c>, the document opens without a password but
+    /// permission restrictions and content encryption are still applied.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <c>null</c>.</exception>
+    void Encrypt(TerraPDF.Core.EncryptionOptions options);
 }

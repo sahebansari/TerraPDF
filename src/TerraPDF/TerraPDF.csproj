@@ -16,7 +16,7 @@
 
      <!-- ── NuGet package identity ───────────────────────────────────────── -->
      <PackageId>TerraPDF</PackageId>
-      <Version>1.2.3</Version>
+      <Version>1.3.0</Version>
       <Authors>Saheb Ansari</Authors>
       <Copyright>Copyright © 2025-2026 TerraPDF Contributors</Copyright>
       <PackageProjectUrl>https://github.com/sahebansari/TerraPDF</PackageProjectUrl>
@@ -45,8 +45,8 @@
      <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
       <Title>TerraPDF - A lightweight PDF library for dotnet developers</Title>
       <PackageIcon>icon.png</PackageIcon>
-       <AssemblyVersion>1.2.2</AssemblyVersion>
-       <FileVersion>1.2.2</FileVersion>
+       <AssemblyVersion>1.3.0</AssemblyVersion>
+       <FileVersion>1.3.0</FileVersion>
   </PropertyGroup>
 
   <!-- Bundle the README into the NuGet package -->

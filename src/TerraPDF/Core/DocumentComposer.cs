@@ -25,6 +25,9 @@ public sealed class DocumentComposer : IDocumentContainer
     private string? _metadataKeywords;
     private string? _metadataCreator;
 
+    // Encryption
+    private EncryptionOptions? _encryptionOptions;
+
     /// <summary>
     /// Static recorder for heading elements during the first-pass render.
     /// </summary>
@@ -132,6 +135,13 @@ public sealed class DocumentComposer : IDocumentContainer
     public void MetadataCreator(string? creator)
     {
         _metadataCreator = string.IsNullOrWhiteSpace(creator) ? null : creator;
+    }
+
+    /// <inheritdoc/>
+    public void Encrypt(EncryptionOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        _encryptionOptions = options;
     }
 
     /// <summary>
@@ -832,6 +842,9 @@ public sealed class DocumentComposer : IDocumentContainer
 
         BookmarkInfo? bookmarkRoot = BuildBookmarkTree();
         doc.SetBookmarks(_bookmarks, totalPages);
+
+        if (_encryptionOptions is not null)
+            doc.SetEncryption(_encryptionOptions);
 
         int pageNumber = 0;
         foreach (var descriptor in _pages)
