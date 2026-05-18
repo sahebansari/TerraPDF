@@ -120,9 +120,11 @@ composer.PublishPdf(stream);
 - [Text & Spans](text-and-spans.md) — styling, underline, line-height, multi-span, page numbers
 - [Layout](layout.md) — Column, Row, Table
 - [Decorators](decorators.md) — Padding, Margin, Background, Border, Rounded Border, Per-Edge Borders, Alignment, Lines, PageBreak, Hyperlink, ShowIf
+- [Vector Graphics](vector-graphics.md) — Canvas API, lines, shapes, Bézier paths, polygons, grids, charts
 - [Images](images.md) — PNG and JPEG embedding
 - [Table of Contents](table-of-contents.md) — headings, automatic TOC generation, internal links
 - [Bookmarks](bookmarks.md) — PDF outlines / hierarchical navigation tree
+- [Unicode & Character Encoding](unicode-and-encoding.md) — WinAnsiEncoding coverage, Windows-1252 specials, Latin-1 Supplement, avoiding `?` characters
 - [Metadata](metadata.md) — document properties (Title, Author, Subject, Keywords, Creator)
 - [Colors](colors.md) — full built-in palette reference
 - [Page Sizes & Units](page-sizes-and-units.md) — all standard sizes and unit conversions

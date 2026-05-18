@@ -9,6 +9,10 @@ A free, pure C# library designed for fast and reliable PDF generation.
 
 📚 **Documentation:** https://github.com/sahebansari/TerraPDF/tree/master/docs
 
+> **New in 1.2.3:** 
+[Unicode & Character Encoding](docs/unicode-and-encoding.md) guide — WinAnsiEncoding coverage, Windows-1252 specials, Latin-1 Supplement, and how to avoid `?` characters.
+[Vector Graphics](docs/vector-graphics.md) guide — Canvas API, lines, shapes, Bézier paths, polygons, grids, charts.
+
 **TerraPDF** is a lightweight, zero-dependency, pure C# library for generating professional PDF 1.7 documents programmatically. 
 It provides a fluent, composable API that covers the full document-authoring lifecycle — from page layout and 
 rich text to tables, images, hyperlinks, and multi-page pagination — with no native binaries, no third-party 
@@ -36,6 +40,8 @@ runtime packages, and no licensing restrictions.
  - Conditional rendering via `ShowIf`
  - Reusable components via `IComponent`
  - Headers, footers, and page numbers
+ - Full **WinAnsiEncoding** character coverage — Latin-1 Supplement (U+00A0–U+00FF) and all 27 Windows-1252 typographic specials (€ ™ ‘ ’ “ ” – — … •) with exact Adobe AFM glyph widths
+ - **Vector graphics canvas** — lines, rectangles, rounded rectangles, circles, ellipses, arbitrary Bézier paths, polygons, and grid helpers via `container.Canvas()`
  - Fluent, composable API
 
 ---
@@ -342,6 +348,74 @@ container.LineVertical(1)                   // vertical rule (black)
 ```csharp
 container.ShowIf(isAdmin).Text("Admin panel");
 ```
+
+---
+
+## Vector Graphics
+
+Place a drawing canvas anywhere in your layout with `container.Canvas(height, draw)`.
+The callback receives a `VectorCanvas` with primitives for every common shape:
+
+```csharp
+container.Canvas(120, c =>
+{
+    // Shapes
+    c.FillRect(0, 0, 80, 60, Color.Blue.Lighten4);
+    c.StrokeRect(0, 0, 80, 60, Color.Blue.Darken2, 1.5);
+    c.FillCircle(140, 30, 25, Color.Orange.Medium);
+    c.DrawRoundedRect(200, 5, 100, 50, 8, Color.Green.Lighten4, Color.Green.Darken2);
+
+    // Arbitrary path (triangle)
+    c.Path(p => p
+        .MoveTo(340, 60)
+        .LineTo(380, 10)
+        .LineTo(420, 60)
+        .Close()
+        .Fill(Color.Purple.Lighten3)
+        .Stroke(Color.Purple.Darken2, 1));
+
+    // Grid background
+    c.Grid(20, hexColor: "#E8EDF2", lineWidth: 0.3);
+});
+```
+
+### VectorCanvas methods
+
+| Method | Description |
+|--------|-------------|
+| `Line(x1,y1,x2,y2, color, lw)` | Straight line |
+| `FillRect` / `StrokeRect` / `DrawRect` | Rectangle (fill / stroke / both) |
+| `FillRoundedRect` / `StrokeRoundedRect` / `DrawRoundedRect` | Rounded rectangle |
+| `FillCircle` / `StrokeCircle` / `DrawCircle` | Circle |
+| `FillEllipse` / `StrokeEllipse` / `DrawEllipse` | Ellipse |
+| `Path(Action<PathDescriptor>)` | Arbitrary path with Bézier curves, polygons, holes |
+| `Grid(cellWidth, cellHeight?, color, lw)` | Full-canvas rectangular grid |
+
+### PathDescriptor
+
+```csharp
+canvas.Path(p => p
+    .MoveTo(10, 10)
+    .LineTo(90, 10)
+    .CurveTo(90, 10, 90, 80, 50, 80)  // cubic Bézier
+    .Close()
+    .Fill(Color.Blue.Lighten4)
+    .Stroke(Color.Blue.Darken2, 1.5));
+
+// Convenience: Polygon, Polyline, Rect, Ellipse, Circle
+canvas.Path(p => p
+    .Polygon((50,10),(90,80),(10,80))
+    .Fill(Color.Orange.Medium));
+
+// Shapes with holes — even-odd fill
+canvas.Path(p => p
+    .Circle(60, 60, 50)  // outer
+    .Circle(60, 60, 25)  // inner (hole)
+    .Fill(Color.Blue.Medium)
+    .UseEvenOddFill());
+```
+
+See [docs/vector-graphics.md](docs/vector-graphics.md) for the full reference.
 
 ---
 

@@ -54,7 +54,7 @@ internal sealed class PdfPage
         _ops.Append(CultureInfo.InvariantCulture, $"{C(color.R)} {C(color.G)} {C(color.B)} rg\n");
         _ops.Append(CultureInfo.InvariantCulture, $"/{fontAlias} {F(fontSize)} Tf\n");
         _ops.Append(CultureInfo.InvariantCulture, $"{F(x)} {F(pdfY)} Td\n");
-        _ops.Append(CultureInfo.InvariantCulture, $"({Escape(text)}) Tj\n");
+        _ops.Append(CultureInfo.InvariantCulture, $"({EscapeForPdfString(text)}) Tj\n");
         _ops.Append("ET\n");
     }
 
@@ -185,6 +185,132 @@ internal sealed class PdfPage
     }
 
     // --------------------------------------------------------------
+    //  Ellipse primitives
+    // --------------------------------------------------------------
+
+    // Appends a closed ellipse path using four cubic Bézier arcs.
+    // cx, cy are the centre in caller (top-left) coordinates.
+    private void AppendEllipsePath(double cx, double cy, double rx, double ry)
+    {
+        // Convert centre from top-left to PDF bottom-left origin
+        double pdfCy = Height - cy;
+        double kx = rx * _bezierArcK;
+        double ky = ry * _bezierArcK;
+
+        _ops.Append(CultureInfo.InvariantCulture, $"{F(cx + rx)} {F(pdfCy)} m\n");
+        _ops.Append(CultureInfo.InvariantCulture,
+            $"{F(cx + rx)} {F(pdfCy + ky)} {F(cx + kx)} {F(pdfCy + ry)} {F(cx)} {F(pdfCy + ry)} c\n");
+        _ops.Append(CultureInfo.InvariantCulture,
+            $"{F(cx - kx)} {F(pdfCy + ry)} {F(cx - rx)} {F(pdfCy + ky)} {F(cx - rx)} {F(pdfCy)} c\n");
+        _ops.Append(CultureInfo.InvariantCulture,
+            $"{F(cx - rx)} {F(pdfCy - ky)} {F(cx - kx)} {F(pdfCy - ry)} {F(cx)} {F(pdfCy - ry)} c\n");
+        _ops.Append(CultureInfo.InvariantCulture,
+            $"{F(cx + kx)} {F(pdfCy - ry)} {F(cx + rx)} {F(pdfCy - ky)} {F(cx + rx)} {F(pdfCy)} c\n");
+        _ops.Append("h\n");
+    }
+
+    /// <summary>Draws a stroked ellipse.</summary>
+    internal void AddStrokedEllipse(double cx, double cy, double rx, double ry,
+        PdfColor strokeColor, double lineWidth = 1)
+    {
+        _ops.Append(CultureInfo.InvariantCulture, $"{F(lineWidth)} w\n");
+        _ops.Append(CultureInfo.InvariantCulture, $"{C(strokeColor.R)} {C(strokeColor.G)} {C(strokeColor.B)} RG\n");
+        AppendEllipsePath(cx, cy, rx, ry);
+        _ops.Append("S\n");
+    }
+
+    /// <summary>Draws a filled ellipse (no border).</summary>
+    internal void AddFilledEllipse(double cx, double cy, double rx, double ry,
+        PdfColor fillColor)
+    {
+        _ops.Append(CultureInfo.InvariantCulture, $"{C(fillColor.R)} {C(fillColor.G)} {C(fillColor.B)} rg\n");
+        AppendEllipsePath(cx, cy, rx, ry);
+        _ops.Append("f\n");
+    }
+
+    /// <summary>Draws a filled and stroked ellipse.</summary>
+    internal void AddFilledAndStrokedEllipse(double cx, double cy, double rx, double ry,
+        PdfColor fillColor, PdfColor strokeColor, double lineWidth = 1)
+    {
+        _ops.Append(CultureInfo.InvariantCulture, $"{F(lineWidth)} w\n");
+        _ops.Append(CultureInfo.InvariantCulture, $"{C(strokeColor.R)} {C(strokeColor.G)} {C(strokeColor.B)} RG\n");
+        _ops.Append(CultureInfo.InvariantCulture, $"{C(fillColor.R)} {C(fillColor.G)} {C(fillColor.B)} rg\n");
+        AppendEllipsePath(cx, cy, rx, ry);
+        _ops.Append("B\n");
+    }
+
+    // --------------------------------------------------------------
+    //  Arbitrary path primitives (used by CanvasElement / PathDescriptor)
+    // --------------------------------------------------------------
+
+    /// <summary>
+    /// Begins a new path sequence.  Sets stroke/fill colours and line width
+    /// if the corresponding paint is requested.
+    /// </summary>
+    internal void BeginPath(
+        PdfColor? fillColor, PdfColor? strokeColor, double lineWidth, bool evenOdd)
+    {
+        if (strokeColor.HasValue)
+        {
+            _ops.Append(CultureInfo.InvariantCulture, $"{F(lineWidth)} w\n");
+            var sc = strokeColor.Value;
+            _ops.Append(CultureInfo.InvariantCulture, $"{C(sc.R)} {C(sc.G)} {C(sc.B)} RG\n");
+        }
+        if (fillColor.HasValue)
+        {
+            var fc = fillColor.Value;
+            _ops.Append(CultureInfo.InvariantCulture, $"{C(fc.R)} {C(fc.G)} {C(fc.B)} rg\n");
+        }
+    }
+
+    /// <summary>Appends a moveto operator (top-left origin, Y flipped internally).</summary>
+    internal void PathMoveTo(double x, double y)
+    {
+        double pdfY = Height - y;
+        _ops.Append(CultureInfo.InvariantCulture, $"{F(x)} {F(pdfY)} m\n");
+    }
+
+    /// <summary>Appends a lineto operator.</summary>
+    internal void PathLineTo(double x, double y)
+    {
+        double pdfY = Height - y;
+        _ops.Append(CultureInfo.InvariantCulture, $"{F(x)} {F(pdfY)} l\n");
+    }
+
+    /// <summary>Appends a cubic Bézier curveto operator.</summary>
+    internal void PathCurveTo(
+        double cx1, double cy1,
+        double cx2, double cy2,
+        double x,   double y)
+    {
+        double pdfCy1 = Height - cy1;
+        double pdfCy2 = Height - cy2;
+        double pdfY   = Height - y;
+        _ops.Append(CultureInfo.InvariantCulture,
+            $"{F(cx1)} {F(pdfCy1)} {F(cx2)} {F(pdfCy2)} {F(x)} {F(pdfY)} c\n");
+    }
+
+    /// <summary>Closes the current subpath.</summary>
+    internal void PathClose() => _ops.Append("h\n");
+
+    /// <summary>
+    /// Ends a path sequence by emitting the appropriate paint operator
+    /// (fill, stroke, fill+stroke, or no-op if neither is set).
+    /// </summary>
+    internal void EndPath(PdfColor? fillColor, PdfColor? strokeColor, bool evenOdd)
+    {
+        if (fillColor.HasValue && strokeColor.HasValue)
+            _ops.Append(evenOdd ? "B*\n" : "B\n");
+        else if (fillColor.HasValue)
+            _ops.Append(evenOdd ? "f*\n" : "f\n");
+        else if (strokeColor.HasValue)
+            _ops.Append("S\n");
+        // else: path with no paint — just discard with n (no-op)
+        else
+            _ops.Append("n\n");
+    }
+
+    // --------------------------------------------------------------
     //  Link annotations
     // --------------------------------------------------------------
 
@@ -270,9 +396,40 @@ internal sealed class PdfPage
     // Formats a colour component [0,1] as a 4-decimal PDF real (e.g. "0.5020")
     private static string C(double d) => d.ToString("F4", CultureInfo.InvariantCulture);
 
-    // Escapes backslash, '(' and ')' which are syntax characters in PDF string literals
-    private static string Escape(string s) =>
-        s.Replace("\\", "\\\\")
-         .Replace("(", "\\(")
-         .Replace(")", "\\)");
+    /// <summary>
+    /// Encodes a string for use inside a PDF literal string  ( … )  in the content stream.
+    /// <list type="bullet">
+    ///   <item>Backslash, '(' and ')' are backslash-escaped as per PDF spec §7.3.4.2.</item>
+    ///   <item>
+    ///     Characters with a WinAnsiEncoding byte value are emitted as octal escapes
+    ///     (<c>\nnn</c>) for any byte outside printable ASCII (0x20–0x7E), ensuring the
+    ///     content stream stays pure ASCII while letting the reader look up the correct
+    ///     glyph via the font's /WinAnsiEncoding.
+    ///   </item>
+    ///   <item>
+    ///     Characters with no WinAnsiEncoding representation (CJK, Arabic, etc.) are
+    ///     substituted with a question mark glyph (<c>?</c>).
+    ///   </item>
+    /// </list>
+    /// </summary>
+    internal static string EscapeForPdfString(string s)
+    {
+        var sb = new StringBuilder(s.Length * 2);
+        foreach (char c in s)
+        {
+            if (WinAnsiEncoding.TryGetByte(c, out byte b))
+            {
+                if (b == (byte)'\\') { sb.Append("\\\\"); }
+                else if (b == (byte)'(') { sb.Append("\\("); }
+                else if (b == (byte)')') { sb.Append("\\)"); }
+                else if (b >= 0x20 && b <= 0x7E) { sb.Append((char)b); }      // printable ASCII — emit directly
+                else { sb.Append('\\'); sb.Append(Convert.ToString(b, 8).PadLeft(3, '0')); } // octal escape
+            }
+            else
+            {
+                sb.Append('?'); // no WinAnsi representation — substitution glyph
+            }
+        }
+        return sb.ToString();
+    }
 }

@@ -584,6 +584,30 @@ public static class ContainerExtensions
         return descriptor;
     }
 
+    // -- Vector canvas ---------------------------------------------
+
+    /// <summary>
+    /// Places a fixed-height vector-graphics canvas that occupies the full available width.
+    /// Use the <see cref="VectorCanvas"/> fluent API inside <paramref name="draw"/> to render
+    /// lines, rectangles, circles, ellipses, rounded rectangles, arbitrary paths, and grids.
+    /// All coordinates inside the callback are in PDF points with a top-left origin
+    /// relative to the canvas element's bounding box.
+    /// </summary>
+    /// <param name="container">The container slot to attach the canvas to.</param>
+    /// <param name="height">Canvas height in PDF points.</param>
+    /// <param name="draw">Callback that receives a <see cref="VectorCanvas"/> and adds drawing commands.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="height"/> is zero or negative.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="draw"/> is <c>null</c>.</exception>
+    public static IContainer Canvas(this IContainer container, double height, Action<VectorCanvas> draw)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+        ArgumentNullException.ThrowIfNull(draw);
+        var canvas = new VectorCanvas();
+        draw(canvas);
+        container.Slot().Child = new CanvasElement(canvas, height);
+        return container;
+    }
+
     // -- Internal link (GoTo) -------------------------------------
 
     /// <summary>

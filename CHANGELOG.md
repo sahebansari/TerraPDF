@@ -6,6 +6,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.3] - 2026-05-18
+
+### Added
+- **Vector Graphics / Canvas API** — `container.Canvas(height, draw)` places a
+  fixed-height drawing surface that fills the available width. The callback receives
+  a `VectorCanvas` with a full set of fluent primitives:
+  - **Lines** — `Line(x1, y1, x2, y2, hexColor, lineWidth)`
+  - **Rectangles** — `FillRect`, `StrokeRect`, `DrawRect` (filled + stroked)
+  - **Rounded rectangles** — `FillRoundedRect`, `StrokeRoundedRect`, `DrawRoundedRect`
+  - **Circles** — `FillCircle`, `StrokeCircle`, `DrawCircle`
+  - **Ellipses** — `FillEllipse`, `StrokeEllipse`, `DrawEllipse`
+  - **Arbitrary paths** — `Path(p => ...)` using `PathDescriptor` with `MoveTo`,
+    `LineTo`, `CurveTo` (cubic Bézier), `Close`, convenience shapes
+    (`Rect`, `Ellipse`, `Circle`, `Polyline`, `Polygon`), paint setters
+    (`Fill`, `Stroke`), and even-odd fill rule (`UseEvenOddFill`)
+  - **Grid helper** — `Grid(cellWidth, cellHeight?, hexColor, lineWidth)` draws a
+    full-canvas rectangular grid
+  - All coordinates use a **top-left origin** in PDF points, consistent with every
+    other TerraPDF layout API
+- **`VectorGraphicsTests.cs`** — test suite exercising every `VectorCanvas` primitive,
+  every `PathDescriptor` command, validation guards, and compound shapes
+- **`10_VectorGraphicsShowcase.cs`** sample — 4-page showcase PDF demonstrating all
+  primitives (lines, rectangles, rounded rectangles, circles, ellipses, arbitrary
+  paths, polygons) plus data-visualisation examples (bar chart, donut chart,
+  line/sparkline chart) built entirely with the Canvas API
+- **`docs/vector-graphics.md`** — new documentation guide covering the Canvas API,
+  all `VectorCanvas` methods, `PathDescriptor` usage, coordinate system, and
+  practical chart/diagram examples
+- **Unicode & WinAnsiEncoding showcase sample** (`11_UnicodeShowcase.cs`) — a 5-page
+  reference PDF demonstrating TerraPDF's full WinAnsiEncoding character coverage:
+  - Page 1: Introduction and an 18-language European language sample table showing
+    correct glyph rendering and line-wrapping across French, German, Spanish,
+    Portuguese, Italian, Dutch, Romanian, Hungarian, Norwegian, Swedish, Finnish,
+    Polish, Czech, Turkish, Catalan, Danish, Welsh, and English.
+  - Page 2: Windows-1252 typographic specials (byte range 0x80–0x9F) with Unicode
+    code points, byte values, rendered glyphs, names, and in-context examples;
+    plus Latin-1 Supplement symbol groups (U+00A0–U+00FF).
+  - Page 3: Complete WinAnsiEncoding byte-to-glyph reference grid (0x20–0xFF),
+    16 columns wide, with row/column labels and greyed-out undefined positions.
+  - Page 4: Multi-font typographic comparison showing Helvetica (sans-serif),
+    Times (serif), and Courier (monospace) rendering the same paragraph.
+  - Page 5: Font metrics deep-dive — advance-width heat-map table and a
+    justified paragraph demonstrating word-spacing and glyph-width accuracy.
+- **`docs/unicode-and-encoding.md`** — new documentation guide covering
+  WinAnsiEncoding coverage, Windows-1252 specials, Latin-1 Supplement characters,
+  octal content-stream encoding, safe character ranges, and the built-in AFM
+  glyph-width tables.
+
+### Fixed
+- Language sample sentences for Polish, Czech, Turkish, Romanian, and Hungarian
+  replaced with WinAnsiEncoding-safe equivalents — characters in the U+0100+ range
+  that lack a WinAnsiEncoding glyph (e.g. Ł, ż, Č, ř, Ş, ğ, ı, ă) previously
+  rendered as `?` in the output PDF.
+- Win-1252 Specials showcase table converted from `ConstantColumn` widths
+  (52 pt + 40 pt + 28 pt) to proportional `RelativeColumn` definitions so the
+  table always fits within the page's content area without overflowing.
+
+---
+
 ## [1.2.2] - 2026-05-04
 
 ### Added
@@ -133,7 +192,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI workflow (GitHub Actions): build, test, coverage.
 - Publish workflow (GitHub Actions): NuGet + symbols on release tag.
 
-[Unreleased]: https://github.com/sahebansari/TerraPDF/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/sahebansari/TerraPDF/compare/v1.2.3...HEAD
+[1.2.3]: https://github.com/sahebansari/TerraPDF/compare/v1.2.2...v1.2.3
+[1.2.2]: https://github.com/sahebansari/TerraPDF/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/sahebansari/TerraPDF/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/sahebansari/TerraPDF/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/sahebansari/TerraPDF/compare/v1.0.0...v1.1.0
