@@ -428,15 +428,15 @@ internal sealed class PdfDocument
 
         var parts = new List<string>();
         if (!string.IsNullOrEmpty(_infoTitle))
-            parts.Add($"/Title ({Escape(_infoTitle)})");
+            parts.Add($"/Title {PdfTextString(_infoTitle)}");
         if (!string.IsNullOrEmpty(_infoAuthor))
-            parts.Add($"/Author ({Escape(_infoAuthor)})");
+            parts.Add($"/Author {PdfTextString(_infoAuthor)}");
         if (!string.IsNullOrEmpty(_infoSubject))
-            parts.Add($"/Subject ({Escape(_infoSubject)})");
+            parts.Add($"/Subject {PdfTextString(_infoSubject)}");
         if (!string.IsNullOrEmpty(_infoKeywords))
-            parts.Add($"/Keywords ({Escape(_infoKeywords)})");
+            parts.Add($"/Keywords {PdfTextString(_infoKeywords)}");
         if (!string.IsNullOrEmpty(_infoCreator))
-            parts.Add($"/Creator ({Escape(_infoCreator)})");
+            parts.Add($"/Creator {PdfTextString(_infoCreator)}");
 
         string infoBody = "<< " + string.Join(" ", parts) + " >>";
         objects.Add((infoId, infoBody));
@@ -455,7 +455,7 @@ internal sealed class PdfDocument
         var parts = new List<string>
         {
             "/Type /Outlines",
-            $"/Title ({Escape(node.Title)})"
+            $"/Title {PdfTextString(node.Title)}"
         };
 
         // Parent entry
@@ -502,9 +502,46 @@ internal sealed class PdfDocument
 
     /// <summary>
     /// Escapes special characters in a PDF string literal (backslash, parentheses).
+    /// For ASCII-only strings (metadata, bookmark titles that are pure ASCII).
     /// </summary>
     private static string Escape(string s) =>
         s.Replace("\\", "\\\\")
          .Replace("(", "\\(")
          .Replace(")", "\\)");
+
+    /// <summary>
+    /// Returns a PDF string token for a text value that may contain non-ASCII characters.
+    /// <list type="bullet">
+    ///   <item>If all characters are representable as printable ASCII the string is emitted
+    ///         as a PDF literal  <c>(text)</c>  with backslash / paren escaping.</item>
+    ///   <item>Otherwise the string is encoded as UTF-16 Big-Endian with a BOM (0xFEFF)
+    ///         and returned as a PDF hex string  <c>&lt;FEFF…&gt;</c>, which all
+    ///         conforming viewers must support (PDF 1.7 §7.9.2.2).</item>
+    /// </list>
+    /// </summary>
+    private static string PdfTextString(string s)
+    {
+        // Fast path: pure ASCII literal
+        bool needsUtf16 = false;
+        foreach (char c in s)
+        {
+            if (c > '\u007E' || c < '\u0020')
+            {
+                needsUtf16 = true;
+                break;
+            }
+        }
+
+        if (!needsUtf16)
+            return $"({Escape(s)})";
+
+        // UTF-16BE with BOM
+        byte[] bytes = System.Text.Encoding.BigEndianUnicode.GetBytes(s);
+        var sb = new StringBuilder(4 + bytes.Length * 2);
+        sb.Append("<FEFF"); // BOM
+        foreach (byte b in bytes)
+            sb.Append(b.ToString("X2", CultureInfo.InvariantCulture));
+        sb.Append('>');
+        return sb.ToString();
+    }
 }
