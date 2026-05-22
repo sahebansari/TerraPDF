@@ -72,7 +72,7 @@ TerraPDF/
 
 ## Making Changes
 
-1. **Fork** the repository and create a branch from `main`:
+1. **Fork** the repository and create a branch from `master`:
    ```sh
    git checkout -b feature/my-feature
    ```
@@ -87,7 +87,7 @@ TerraPDF/
    dotnet test -c Release
    ```
 
-5. Open a Pull Request against `main`.
+5. Open a Pull Request against `master`.
 
 ---
 
@@ -168,7 +168,7 @@ label `enhancement`. Describe the use-case, not just the solution.
 
 1. Bump `<Version>` in `src/TerraPDF/TerraPDF.csproj`.
 2. Update `CHANGELOG.md` — move items from `[Unreleased]` to a new versioned section.
-3. Commit and push to `main`.
+3. Commit and push to `master`.
 4. Create a **GitHub Release** with a tag matching the version (e.g. `v1.1.0`).
    - The `publish.yml` workflow automatically packs and pushes the `.nupkg`
      and `.snupkg` (symbols) to nuget.org.
