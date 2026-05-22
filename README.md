@@ -108,19 +108,21 @@ Document.Create(container =>
 
 For complete API reference and detailed guides, visit the [docs](https://github.com/sahebansari/TerraPDF/tree/master/docs/) directory:
 
-- **[Text & Typography](https://github.com/sahebansari/TerraPDF/tree/master/docs)** — Single-span and multi-span text, styling, page numbers
-- **[Layout Containers](https://github.com/sahebansari/TerraPDF/tree/master/docs)** — Column, Row, and Table layouts with alignment and spacing
-- **[Page Configuration](https://github.com/sahebansari/TerraPDF/tree/master/docs)** — Page sizes, margins, headers, footers, and page colors
-- **[Decorators](https://github.com/sahebansari/TerraPDF/tree/master/docs)** — Padding, margin, backgrounds, borders, and styling
-- **[Hyperlinks & Navigation](https://github.com/sahebansari/TerraPDF/tree/master/docs)** — URI links, internal links, bookmarks, Table of Contents
-- **[Images](https://github.com/sahebansari/TerraPDF/tree/master/docs)** — PNG and JPEG embedding with sizing and alignment
-- **[Headings](https://github.com/sahebansari/TerraPDF/tree/master/docs)** — H1–H6 section headings with customizable styles
+- **[Getting Started](https://github.com/sahebansari/TerraPDF/blob/master/docs/getting-started.md)** — Installation, Quick Start, and basic usage
+- **[Text & Spans](https://github.com/sahebansari/TerraPDF/blob/master/docs/text-and-spans.md)** — Single-span and multi-span text, styling, page numbers
+- **[Layout](https://github.com/sahebansari/TerraPDF/blob/master/docs/layout.md)** — Column, Row, and Table layouts with alignment and spacing
+- **[Row and Column Layout](https://github.com/sahebansari/TerraPDF/blob/master/docs/row-and-column-layout.md)** — Detailed Row and Column layout examples
+- **[Decorators](https://github.com/sahebansari/TerraPDF/blob/master/docs/decorators.md)** — Padding, margin, backgrounds, borders, and styling
+- **[Images](https://github.com/sahebansari/TerraPDF/blob/master/docs/images.md)** — PNG and JPEG embedding with sizing and alignment
+- **[Page Sizes & Units](https://github.com/sahebansari/TerraPDF/blob/master/docs/page-sizes-and-units.md)** — Built-in page sizes and unit conversions
+- **[Colors](https://github.com/sahebansari/TerraPDF/blob/master/docs/colors.md)** — Material Design color palette with shades
 - **[Encryption & Security](https://github.com/sahebansari/TerraPDF/blob/master/docs/encryption.md)** — AES-128 protection with permission flags
 - **[Vector Graphics](https://github.com/sahebansari/TerraPDF/blob/master/docs/vector-graphics.md)** — Canvas API, shapes, paths, grids, and charts
-- **[Page Sizes & Units](https://github.com/sahebansari/TerraPDF/tree/master/docs)** — Built-in page sizes and unit conversions
-- **[Colors](https://github.com/sahebansari/TerraPDF/tree/master/docs)** — Material Design color palette with shades
-- **[Reusable Components](https://github.com/sahebansari/TerraPDF/tree/master/docs)** — Creating custom components and document templates
-- **[Unicode & Character Encoding](https://github.com/sahebansari/TerraPDF/blob/master/docs/unicode-and-encoding.md)** — WinAnsiEncoding, character coverage
+- **[Table of Contents](https://github.com/sahebansari/TerraPDF/blob/master/docs/table-of-contents.md)** — Automatic TOC generation from headings
+- **[Bookmarks](https://github.com/sahebansari/TerraPDF/blob/master/docs/bookmarks.md)** — PDF bookmarks and outlines
+- **[Components & Templates](https://github.com/sahebansari/TerraPDF/blob/master/docs/components-and-templates.md)** — Reusable components and document templates
+- **[Metadata](https://github.com/sahebansari/TerraPDF/blob/master/docs/metadata.md)** — Document metadata (Title, Author, Subject, Keywords, Creator)
+- **[Unicode & Character Encoding](https://github.com/sahebansari/TerraPDF/blob/master/docs/unicode-and-encoding.md)** — WinAnsiEncoding and character coverage
 - **[Samples](https://github.com/sahebansari/TerraPDF/tree/master/samples)** — Complete working examples demonstrating all features
 
 ---
