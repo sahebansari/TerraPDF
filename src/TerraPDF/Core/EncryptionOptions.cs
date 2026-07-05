@@ -1,5 +1,24 @@
 namespace TerraPDF.Core;
 
+/// <summary>Encryption algorithm used by the PDF Standard Security Handler.</summary>
+public enum EncryptionAlgorithm
+{
+    /// <summary>
+    /// AES-256 with Standard Security Handler revision 6 (ISO 32000-2 / PDF 2.0).
+    /// SHA-2 based key derivation; the modern default.  Supported by every
+    /// mainstream viewer since ~2010 (Adobe Acrobat 9+, Chrome, Edge, Firefox,
+    /// Preview, Foxit, Okular, …).
+    /// </summary>
+    Aes256,
+
+    /// <summary>
+    /// AES-128 with Standard Security Handler revision 4 (PDF 1.6+).
+    /// Uses the legacy MD5/RC4-based key-derivation chain; choose this only
+    /// when documents must open in very old viewers (pre-2008).
+    /// </summary>
+    Aes128,
+}
+
 /// <summary>
 /// Configuration for PDF encryption.  Pass an instance to
 /// <c>container.Encrypt(options)</c> inside <c>Document.Create</c>.
@@ -63,4 +82,12 @@ public sealed class EncryptionOptions
     /// may do.  Defaults to <see cref="PdfPermissions.All"/>.
     /// </summary>
     public PdfPermissions Permissions { get; set; } = PdfPermissions.All;
+
+    /// <summary>
+    /// Encryption algorithm.  Defaults to <see cref="EncryptionAlgorithm.Aes256"/>
+    /// (Standard Security Handler revision 6, PDF 2.0).  Set to
+    /// <see cref="EncryptionAlgorithm.Aes128"/> only when documents must open in
+    /// very old viewers.
+    /// </summary>
+    public EncryptionAlgorithm Algorithm { get; set; } = EncryptionAlgorithm.Aes256;
 }

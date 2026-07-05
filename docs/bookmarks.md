@@ -16,7 +16,45 @@ When the PDF is saved, TerraPDF generates a complete `/Outlines` dictionary tree
 
 ---
 
-## Basic Usage
+## Anchor-Based Bookmarks (recommended)
+
+Instead of supplying a page number, anchor a bookmark directly to content with
+the `IContainer.Bookmark()` extension — the target page and vertical position
+are resolved automatically when the document is rendered, so bookmarks stay
+correct as content grows or reflows:
+
+```csharp
+Document.Create(c =>
+{
+    c.Page(p =>
+    {
+        p.Size(PageSize.A4);
+        p.Content().Column(col =>
+        {
+            col.Item().Bookmark("Chapter 1").H1("Chapter 1");
+            col.Item().Text("...");
+            col.PageBreak();
+            // Nested under Chapter 1, wherever it lands
+            col.Item().Bookmark("Section 1.1", parentTitle: "Chapter 1").H2("Section 1.1");
+        });
+    });
+})
+.PublishPdf("book.pdf");
+```
+
+Anchored bookmarks generate zoom-retaining `/XYZ` destinations at the anchored
+element's position — clicking one scrolls to the element without changing the
+reader's zoom level — and can be nested under other anchors or manual bookmarks
+via `parentTitle`. Anchors wrap individual items — wrapping a whole multi-page
+column records only the column's starting position. These destinations also
+keep the reader's zoom level and land at the correct Y position after layout.
+
+The page-number-based API below remains available for cases where you want an
+outline entry that does not correspond to a specific element.
+
+---
+
+## Basic Usage (manual page numbers)
 
 ### Simple bookmark
 
@@ -45,7 +83,7 @@ Supply a Y-coordinate (in points from the top of the page) to control where the 
 c.Bookmark("Introduction", 1, 72.0);  // starts 1 inch from page top
 ```
 
-This generates a `/FitH` destination (fit width, top edge at 72.0 points). If the `top` parameter is omitted, a `/Fit` destination is used (entire page fit).
+This generates an `/XYZ` destination with a null zoom, so the view scrolls to the given position while keeping the reader's current zoom level. If the `top` parameter is omitted, the view scrolls to the top of the page (still zoom-retaining).
 
 ---
 

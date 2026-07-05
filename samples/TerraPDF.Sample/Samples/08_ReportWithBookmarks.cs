@@ -5,8 +5,11 @@ namespace TerraPDF.Sample.Samples;
 
 // =============================================================================
 //  8. REPORT WITH BOOKMARKS / OUTLINES
-//  Shows: the bookmark/outline feature with hierarchical structure
-//  (top-level sections, sub-sections, and page-positioned entries).
+//  Shows: anchor-based bookmarks — each outline entry is attached directly to
+//  its heading with container.Bookmark("Title"[, parentTitle]), so the target
+//  page and exact vertical position are resolved automatically during render.
+//  Clicking an entry scrolls precisely to the anchored heading and keeps the
+//  reader's current zoom level (/XYZ destinations with null zoom).
 // =============================================================================
 internal static class ReportWithBookmarks
 {
@@ -25,29 +28,9 @@ internal static class ReportWithBookmarks
             doc.MetadataKeywords("pdf; terra; dotnet; guide; documentation");
             doc.MetadataCreator("TerraPDF Sample Generator v1.0");
 
-            // ── Define bookmarks ───────────────────────────────────────────────
-            doc.Bookmark("Introduction",    1, 120.0);
-            doc.Bookmark("Getting Started", 2);
-            doc.Bookmark("Core Features",   3);
-            doc.Bookmark("Advanced Topics", 5);
-            doc.Bookmark("Appendix",        6);
-
-            doc.Bookmark("Installation",  2, "Getting Started");
-            doc.Bookmark("Quick Start",   2, "Getting Started", 200.0);
-            doc.Bookmark("Configuration", 2, "Getting Started", 280.0);
-
-            doc.Bookmark("Text & Typography",  3, "Core Features");
-            doc.Bookmark("Layout Containers",  3, "Core Features", 150.0);
-            doc.Bookmark("Tables",             4, "Core Features");
-            doc.Bookmark("Images & Hyperlinks",4, "Core Features", 200.0);
-
-            doc.Bookmark("Multi-Page Documents", 5, "Advanced Topics");
-            doc.Bookmark("Custom Styling",       5, "Advanced Topics", 150.0);
-            doc.Bookmark("Performance Tips",     5, "Advanced Topics");
-
-            doc.Bookmark("API Reference",   6, "Appendix");
-            doc.Bookmark("Sample Code",     6, "Appendix", 100.0);
-            doc.Bookmark("Migration Guide", 6, "Appendix");
+            // Bookmarks are anchored inline on the headings below — no page
+            // numbers or Y offsets to maintain by hand. See each
+            // .Bookmark("Title"[, parentTitle]) call in the page content.
 
             // ── Page 1: Introduction ──────────────────────────────────────────
             doc.Page(page =>
@@ -63,7 +46,7 @@ internal static class ReportWithBookmarks
 
                 page.Content().Column(col =>
                 {
-                    col.Item().PaddingTop(20).Text("Introduction")
+                    col.Item().Bookmark("Introduction").PaddingTop(20).Text("Introduction")
                         .Bold().FontSize(22).FontColor(brand).AlignCenter();
                     col.Item().PaddingTop(12).Text(
                         "This guide provides a comprehensive overview of TerraPDF, " +
@@ -108,7 +91,12 @@ internal static class ReportWithBookmarks
 
                 page.Content().Column(col =>
                 {
-                    col.Item().PaddingTop(24).Text("Installation").Bold().FontSize(18).FontColor(brand);
+                    // The top-level "Getting Started" entry and its first child
+                    // are both anchored on this heading (chained wrappers).
+                    col.Item()
+                        .Bookmark("Getting Started")
+                        .Bookmark("Installation", parentTitle: "Getting Started")
+                        .PaddingTop(24).Text("Installation").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(10).Text(
                         "Install TerraPDF via NuGet: dotnet add package TerraPDF. " +
                         "The library targets .NET 8.0 and .NET 9.0, with no external dependencies. " +
@@ -116,7 +104,8 @@ internal static class ReportWithBookmarks
                         "across all platforms supported by .NET.")
                         .Justify().FontColor(muted);
 
-                    col.Item().PaddingTop(20).Text("Quick Start").Bold().FontSize(18).FontColor(brand);
+                    col.Item().Bookmark("Quick Start", parentTitle: "Getting Started")
+                        .PaddingTop(20).Text("Quick Start").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(10).Text(
                         "Create your first PDF in minutes with the fluent builder pattern. " +
                         "Start with Document.Create(), define one or more pages, and add content " +
@@ -124,7 +113,8 @@ internal static class ReportWithBookmarks
                         "multi-page pagination, table splitting, and page numbering.")
                         .Justify().FontColor(muted);
 
-                    col.Item().PaddingTop(20).Text("Configuration").Bold().FontSize(18).FontColor(brand);
+                    col.Item().Bookmark("Configuration", parentTitle: "Getting Started")
+                        .PaddingTop(20).Text("Configuration").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(10).Text(
                         "Every PageDescriptor offers extensive configuration: page size (A0-A6, Letter, " +
                         "Legal, or custom), margins (uniform or per-edge), background colour, and a " +
@@ -156,7 +146,10 @@ internal static class ReportWithBookmarks
 
                 page.Content().Column(col =>
                 {
-                    col.Item().PaddingTop(10).Text("Text & Typography").Bold().FontSize(18).FontColor(brand);
+                    col.Item()
+                        .Bookmark("Core Features")
+                        .Bookmark("Text & Typography", parentTitle: "Core Features")
+                        .PaddingTop(10).Text("Text & Typography").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Text(
                         "TerraPDF provides comprehensive typographic controls: font size, colour (hex or " +
                         "Material Design palette), bold, italic, underline, strikethrough, and line-height " +
@@ -164,7 +157,8 @@ internal static class ReportWithBookmarks
                         "within a single paragraph. Alignment options include left, centre, right, and justified.")
                         .Justify().FontColor(muted);
 
-                    col.Item().PaddingTop(16).Text("Layout Containers").Bold().FontSize(18).FontColor(brand);
+                    col.Item().Bookmark("Layout Containers", parentTitle: "Core Features")
+                        .PaddingTop(16).Text("Layout Containers").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Text(
                         "Three core layout containers enable flexible page composition:\n" +
                         "• Column  — vertically stacks items with configurable spacing; auto-paginates.\n" +
@@ -173,7 +167,8 @@ internal static class ReportWithBookmarks
                         "All containers support decorators: Padding, Margin, Background, Border, and Alignment.")
                         .Justify().FontColor(muted);
 
-                    col.Item().PaddingTop(16).Text("Images & Hyperlinks").Bold().FontSize(18).FontColor(brand);
+                    col.Item().Bookmark("Images & Hyperlinks", parentTitle: "Core Features")
+                        .PaddingTop(16).Text("Images & Hyperlinks").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Text(
                         "Embed PNG (RGB) and JPEG images directly. TerraPDF decodes PNGs and recompresses " +
                         "them with FlateDecode; JPEGs are embedded verbatim. Hyperlink elements create URI " +
@@ -204,7 +199,8 @@ internal static class ReportWithBookmarks
 
                 page.Content().Column(col =>
                 {
-                    col.Item().PaddingTop(10).Text("Tables").Bold().FontSize(18).FontColor(brand);
+                    col.Item().Bookmark("Tables", parentTitle: "Core Features")
+                        .PaddingTop(10).Text("Tables").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Text(
                         "Tables are the most powerful layout primitive in TerraPDF. Define columns using " +
                         "relative widths (proportional to available space) or fixed point sizes. Header rows " +
@@ -213,7 +209,8 @@ internal static class ReportWithBookmarks
                         "heights across page breaks, ensuring predictable pagination.")
                         .Justify().FontColor(muted);
 
-                    col.Item().PaddingTop(16).Text("Decorators").Bold().FontSize(18).FontColor(brand);
+                    col.Item().Bookmark("Decorators", parentTitle: "Core Features")
+                        .PaddingTop(16).Text("Decorators").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Text(
                         "Every container and element can be wrapped with decorators that modify its box model. " +
                         "Padding adds inner spacing; Margin adds outer spacing; Background fills the content " +
@@ -245,7 +242,10 @@ internal static class ReportWithBookmarks
 
                 page.Content().Column(col =>
                 {
-                    col.Item().PaddingTop(24).Text("Multi-Page Documents").Bold().FontSize(18).FontColor(brand);
+                    col.Item()
+                        .Bookmark("Advanced Topics")
+                        .Bookmark("Multi-Page Documents", parentTitle: "Advanced Topics")
+                        .PaddingTop(24).Text("Multi-Page Documents").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Text(
                         "TerraPDF uses a two-pass rendering strategy: the first pass measures all content " +
                         "to determine the total page count (enabling accurate page-number placeholders), " +
@@ -253,7 +253,8 @@ internal static class ReportWithBookmarks
                         "pages when content overflows; explicit PageBreak() elements force a new page at any point.")
                         .Justify().FontColor(muted).FontSize(10);
 
-                    col.Item().PaddingTop(16).Text("Custom Styling").Bold().FontSize(18).FontColor(brand);
+                    col.Item().Bookmark("Custom Styling", parentTitle: "Advanced Topics")
+                        .PaddingTop(16).Text("Custom Styling").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Text(
                         "The TextStyle value object is immutable — every mutating method returns a new instance. " +
                         "This copy-on-write pattern ensures that styles are safely shared across elements without " +
@@ -261,7 +262,8 @@ internal static class ReportWithBookmarks
                         "a base style, then override selectively on individual elements.")
                         .Justify().FontColor(muted).FontSize(10);
 
-                    col.Item().PaddingTop(16).Text("Performance Tips").Bold().FontSize(18).FontColor(brand);
+                    col.Item().Bookmark("Performance Tips", parentTitle: "Advanced Topics")
+                        .PaddingTop(16).Text("Performance Tips").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Text(
                         "TerraPDF is designed for high-throughput scenarios: PDFs are generated entirely in-memory " +
                         "with efficient string builders and binary stream compression. Avoid repeatedly creating " +
@@ -293,7 +295,10 @@ internal static class ReportWithBookmarks
 
                 page.Content().Column(col =>
                 {
-                    col.Item().PaddingTop(24).Text("API Reference").Bold().FontSize(18).FontColor(brand);
+                    col.Item()
+                        .Bookmark("Appendix")
+                        .Bookmark("API Reference", parentTitle: "Appendix")
+                        .PaddingTop(24).Text("API Reference").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Text(
                         "The TerraPDF API surface is intentionally small and composable. Key entry points:\n" +
                         "• Document.Create() — starts a new document builder.\n" +
@@ -303,7 +308,8 @@ internal static class ReportWithBookmarks
                         "All public methods validate arguments and throw appropriate exceptions for invalid input.")
                         .Justify().FontColor(muted).FontSize(10);
 
-                    col.Item().PaddingTop(20).Text("Sample Code").Bold().FontSize(18).FontColor(brand);
+                    col.Item().Bookmark("Sample Code", parentTitle: "Appendix")
+                        .PaddingTop(20).Text("Sample Code").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Background(lightBrand).Padding(10).Text(
                         "var pdf = Document.Create(doc =>\n" +
                         "{\n    doc.Page(page =>\n" +
@@ -311,7 +317,8 @@ internal static class ReportWithBookmarks
                         "}).PublishPdf(\"output.pdf\");")
                         .FontColor(Color.Blue.Darken1).FontSize(9).Justify();
 
-                    col.Item().PaddingTop(16).Text("Migration Guide").Bold().FontSize(18).FontColor(brand);
+                    col.Item().Bookmark("Migration Guide", parentTitle: "Appendix")
+                        .PaddingTop(16).Text("Migration Guide").Bold().FontSize(18).FontColor(brand);
                     col.Item().PaddingTop(8).Text(
                         "Upgrading from TerraPDF 1.x to 2.0? Key breaking changes include the new descriptor " +
                         "pattern (PageDescriptor, TextDescriptor, SpanDescriptor), removal of the legacy fluent " +

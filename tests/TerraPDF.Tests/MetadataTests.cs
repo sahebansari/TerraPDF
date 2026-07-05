@@ -172,7 +172,7 @@ public sealed class MetadataTests
     }
 
     [Fact]
-    public void InfoDictionaryIsReferencedFromCatalog()
+    public void InfoDictionaryIsReferencedFromTrailer()
     {
         byte[] bytes = Build(c =>
         {
@@ -185,10 +185,18 @@ public sealed class MetadataTests
         });
 
         string pdf = PdfString(bytes);
-        Assert.Contains("/Info ", pdf);
-        Assert.Contains("/Catalog ", pdf);
-        // The Catalog should contain /Info N 0 R
-        Assert.Contains("/Info ", pdf);
+
+        // The Info dictionary must be referenced from the trailer (PDF 1.7 §7.5.5) …
+        int trailerStart = pdf.IndexOf("trailer", StringComparison.Ordinal);
+        Assert.True(trailerStart >= 0, "PDF must contain a trailer");
+        string trailer = pdf[trailerStart..pdf.IndexOf("startxref", StringComparison.Ordinal)];
+        Assert.Contains("/Info ", trailer);
+
+        // … and NOT from the catalog (which has no /Info key in the spec).
+        int catalogStart = pdf.IndexOf("/Type /Catalog", StringComparison.Ordinal);
+        Assert.True(catalogStart >= 0, "PDF must contain a catalog");
+        string catalogObj = pdf[catalogStart..pdf.IndexOf(">>", catalogStart, StringComparison.Ordinal)];
+        Assert.DoesNotContain("/Info", catalogObj);
     }
 
     [Fact]

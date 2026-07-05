@@ -16,6 +16,8 @@ dotnet add package TerraPDF
 
 ---
 
+TerraPDF 1.4.0 brings a few notable upgrades for document authorship: AES-256 encryption is now the default, images can be supplied from bytes or streams, anchor-based bookmarks track rendered content automatically, and the multi-span text API uses immutable `TextStyle` callbacks.
+
 ## Minimal Example
 
 ```csharp
@@ -122,7 +124,7 @@ composer.PublishPdf(stream);
 - [Decorators](decorators.md) — Padding, Margin, Background, Border, Rounded Border, Per-Edge Borders, Alignment, Lines, PageBreak, Hyperlink, ShowIf
 - [Vector Graphics](vector-graphics.md) — Canvas API, lines, shapes, Bézier paths, polygons, grids, charts
 - [Images](images.md) — PNG and JPEG embedding
-- [Encryption](encryption.md) — AES-128 password protection and permission flags
+- [Encryption](encryption.md) — AES-256 by default, plus AES-128 compatibility mode and permission flags
 - [Table of Contents](table-of-contents.md) — headings, automatic TOC generation, internal links
 - [Bookmarks](bookmarks.md) — PDF outlines / hierarchical navigation tree
 - [Unicode & Character Encoding](unicode-and-encoding.md) — WinAnsiEncoding coverage, Windows-1252 specials, Latin-1 Supplement, avoiding `?` characters

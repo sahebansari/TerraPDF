@@ -3,9 +3,12 @@ using System.IO.Compression;
 namespace TerraPDF.Drawing;
 
 /// <summary>
-/// Minimal pure-C# PNG decoder that produces flat 24-bit RGB pixel data.
-/// Supports color types 2 (RGB), 6 (RGBA - alpha discarded), and 3 (indexed/palette),
+/// Minimal pure-C# PNG decoder that produces flat 24-bit RGB pixel data plus an
+/// optional alpha channel.
+/// Supports color types 2 (RGB), 6 (RGBA), and 3 (indexed/palette),
 /// all at bit depth 8. Interlaced PNGs are not supported.
+/// Alpha is extracted only from colour type 6; indexed transparency (tRNS) is
+/// not supported and decodes as opaque.
 /// </summary>
 internal static class PngDecoder
 {
@@ -13,16 +16,12 @@ internal static class PngDecoder
     private static readonly byte[] Signature = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
 
     /// <summary>
-    /// Decodes a PNG file at <paramref name="path"/> and returns a flat row-major
-    /// array of RGB bytes (3 bytes per pixel, top-to-bottom, left-to-right).
+    /// Decodes a PNG stream and returns a flat row-major array of RGB bytes
+    /// (3 bytes per pixel, top-to-bottom, left-to-right).
+    /// <paramref name="alpha"/> receives one byte per pixel for RGBA images that
+    /// actually use transparency, or <c>null</c> when the image is fully opaque.
     /// </summary>
-    internal static byte[] Decode(string path, out int width, out int height)
-    {
-        using var fs = File.OpenRead(path);
-        return Decode(fs, out width, out height);
-    }
-
-    internal static byte[] Decode(Stream stream, out int width, out int height)
+    internal static byte[] Decode(Stream stream, out int width, out int height, out byte[]? alpha)
     {
         ValidateSignature(stream);
 
@@ -94,15 +93,21 @@ internal static class PngDecoder
         zlib.CopyTo(rawMs);
         byte[] raw = rawMs.ToArray();
 
-        return Unfilter(raw, imgWidth, imgHeight, colorType, palette);
+        return Unfilter(raw, imgWidth, imgHeight, colorType, palette, out alpha);
     }
 
     // ------------------------------------------------------------
     //  PNG row un-filtering
     // ------------------------------------------------------------
 
-    private static byte[] Unfilter(byte[] raw, int width, int height, int colorType, byte[]? palette)
+    private static byte[] Unfilter(byte[] raw, int width, int height, int colorType, byte[]? palette,
+        out byte[]? alpha)
     {
+        // Alpha channel is only present in RGBA (type 6); collected per pixel,
+        // returned as null when the image turns out to be fully opaque.
+        byte[]? alphaBytes = colorType == 6 ? new byte[width * height] : null;
+        bool anyTransparency = false;
+
         // Bytes per source pixel in the filtered data stream
         int srcBpp = colorType switch
         {
@@ -140,10 +145,13 @@ internal static class PngDecoder
                         rgb[dstOffset++] = row[x * 3 + 1];
                         rgb[dstOffset++] = row[x * 3 + 2];
                         break;
-                    case 6: // RGBA - discard alpha channel
+                    case 6: // RGBA - RGB copied, alpha collected for a /SMask
                         rgb[dstOffset++] = row[x * 4];
                         rgb[dstOffset++] = row[x * 4 + 1];
                         rgb[dstOffset++] = row[x * 4 + 2];
+                        byte a = row[x * 4 + 3];
+                        alphaBytes![y * width + x] = a;
+                        if (a != 0xFF) anyTransparency = true;
                         break;
                     case 3: // Indexed - look up colour in palette
                         int pi = row[x] * 3;
@@ -157,6 +165,7 @@ internal static class PngDecoder
             prevRow = row;
         }
 
+        alpha = anyTransparency ? alphaBytes : null;
         return rgb;
     }
 

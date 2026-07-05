@@ -31,11 +31,15 @@ public static class ContainerExtensions
 
     // -- Text ------------------------------------------------------
 
-    /// <summary>Places a text element with a single literal string.</summary>
-    /// <exception cref="ArgumentException"><paramref name="text"/> is null or whitespace.</exception>
+    /// <summary>
+    /// Places a text element with a single literal string.
+    /// Empty or whitespace-only strings render as an empty block, so dynamic
+    /// data (e.g. an empty table cell value) never needs a caller-side guard.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> is <c>null</c>.</exception>
     public static TextDescriptor Text(this IContainer container, string text)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        ArgumentNullException.ThrowIfNull(text);
         var element = new TextBlock(text);
         container.Slot().Child = element;
         return new TextDescriptor(element);
@@ -125,8 +129,10 @@ public static class ContainerExtensions
         container.PaddingVertical(UnitConversion.ToPoints(value, unit));
 
     /// <summary>Adds horizontal (left + right) padding.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
     public static IContainer PaddingHorizontal(this IContainer container, double value)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
         var element = new Padding { Left = value, Right = value };
         return container.SetAndReturnInner(element, element.Inner);
     }
@@ -136,29 +142,37 @@ public static class ContainerExtensions
         container.PaddingHorizontal(UnitConversion.ToPoints(value, unit));
 
     /// <summary>Adds padding only to the top.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
     public static IContainer PaddingTop(this IContainer container, double value)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
         var element = new Padding { Top = value };
         return container.SetAndReturnInner(element, element.Inner);
     }
 
     /// <summary>Adds padding only to the bottom.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
     public static IContainer PaddingBottom(this IContainer container, double value)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
         var element = new Padding { Bottom = value };
         return container.SetAndReturnInner(element, element.Inner);
     }
 
     /// <summary>Adds padding only to the left.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
     public static IContainer PaddingLeft(this IContainer container, double value)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
         var element = new Padding { Left = value };
         return container.SetAndReturnInner(element, element.Inner);
     }
 
     /// <summary>Adds padding only to the right.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
     public static IContainer PaddingRight(this IContainer container, double value)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
         var element = new Padding { Right = value };
         return container.SetAndReturnInner(element, element.Inner);
     }
@@ -201,8 +215,10 @@ public static class ContainerExtensions
         container.MarginVertical(UnitConversion.ToPoints(value, unit));
 
     /// <summary>Adds horizontal (left + right) margin.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
     public static IContainer MarginHorizontal(this IContainer container, double value)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
         var element = new Margin { Left = value, Right = value };
         return container.SetAndReturnInner(element, element.Inner);
     }
@@ -212,8 +228,10 @@ public static class ContainerExtensions
         container.MarginHorizontal(UnitConversion.ToPoints(value, unit));
 
     /// <summary>Adds margin only to the top.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
     public static IContainer MarginTop(this IContainer container, double value)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
         var element = new Margin { Top = value };
         return container.SetAndReturnInner(element, element.Inner);
     }
@@ -223,8 +241,10 @@ public static class ContainerExtensions
         container.MarginTop(UnitConversion.ToPoints(value, unit));
 
     /// <summary>Adds margin only to the bottom.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
     public static IContainer MarginBottom(this IContainer container, double value)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
         var element = new Margin { Bottom = value };
         return container.SetAndReturnInner(element, element.Inner);
     }
@@ -234,8 +254,10 @@ public static class ContainerExtensions
         container.MarginBottom(UnitConversion.ToPoints(value, unit));
 
     /// <summary>Adds margin only to the left.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
     public static IContainer MarginLeft(this IContainer container, double value)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
         var element = new Margin { Left = value };
         return container.SetAndReturnInner(element, element.Inner);
     }
@@ -245,8 +267,10 @@ public static class ContainerExtensions
         container.MarginLeft(UnitConversion.ToPoints(value, unit));
 
     /// <summary>Adds margin only to the right.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="value"/> is negative.</exception>
     public static IContainer MarginRight(this IContainer container, double value)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
         var element = new Margin { Right = value };
         return container.SetAndReturnInner(element, element.Inner);
     }
@@ -490,6 +514,71 @@ public static class ContainerExtensions
         return container;
     }
 
+    /// <summary>
+    /// Places a PNG or JPEG image from raw file bytes (format detected from the
+    /// data's magic bytes). The image scales to fill the available width while
+    /// preserving its aspect ratio.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="imageData"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="imageData"/> is empty.</exception>
+    public static IContainer Image(this IContainer container, byte[] imageData)
+    {
+        ArgumentNullException.ThrowIfNull(imageData);
+        if (imageData.Length == 0)
+            throw new ArgumentException("Image data must not be empty.", nameof(imageData));
+        container.Slot().Child = new ImageElement(imageData);
+        return container;
+    }
+
+    /// <summary>
+    /// Places a PNG or JPEG image from raw file bytes, constrained to
+    /// <paramref name="width"/> PDF points.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="imageData"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="imageData"/> is empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="width"/> is zero or negative.</exception>
+    public static IContainer Image(this IContainer container, byte[] imageData, double width)
+    {
+        ArgumentNullException.ThrowIfNull(imageData);
+        if (imageData.Length == 0)
+            throw new ArgumentException("Image data must not be empty.", nameof(imageData));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        container.Slot().Child = new ImageElement(imageData, width);
+        return container;
+    }
+
+    /// <summary>
+    /// Places a PNG or JPEG image read from a stream (format detected from the
+    /// data's magic bytes). The stream is read to the end; the caller retains
+    /// ownership and must dispose it.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="imageStream"/> is <c>null</c>.</exception>
+    public static IContainer Image(this IContainer container, Stream imageStream)
+    {
+        ArgumentNullException.ThrowIfNull(imageStream);
+        return container.Image(ReadAllBytes(imageStream));
+    }
+
+    /// <summary>
+    /// Places a PNG or JPEG image read from a stream, constrained to
+    /// <paramref name="width"/> PDF points.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="imageStream"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="width"/> is zero or negative.</exception>
+    public static IContainer Image(this IContainer container, Stream imageStream, double width)
+    {
+        ArgumentNullException.ThrowIfNull(imageStream);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        return container.Image(ReadAllBytes(imageStream), width);
+    }
+
+    private static byte[] ReadAllBytes(Stream stream)
+    {
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        return ms.ToArray();
+    }
+
     // -- Show-if ---------------------------------------------------
 
     /// <summary>Renders child content only when <paramref name="condition"/> is <c>true</c>.</summary>
@@ -514,6 +603,24 @@ public static class ContainerExtensions
     {
         container.Slot().Child = new PageBreak();
         return container;
+    }
+
+    // -- Bookmark anchor -------------------------------------------
+
+    /// <summary>
+    /// Marks the child content as a bookmark (PDF outline) destination.  The
+    /// target page number and vertical position are resolved automatically when
+    /// the document is rendered — unlike the document-level
+    /// <c>Bookmark(title, pageNumber)</c> API, no page number is supplied.
+    /// Nest entries by passing the <paramref name="parentTitle"/> of a
+    /// previously anchored (or manually added) bookmark.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="title"/> is null or whitespace.</exception>
+    public static IContainer Bookmark(this IContainer container, string title, string? parentTitle = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        var element = new BookmarkAnchorElement { Title = title, ParentTitle = parentTitle };
+        return container.SetAndReturnInner(element, element.Inner);
     }
 
     // -- Hyperlink -------------------------------------------------
@@ -628,6 +735,7 @@ public static class ContainerExtensions
 /// <summary>A no-op element used as a placeholder when content is hidden.</summary>
 internal sealed class Empty : Element
 {
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null) => new(0, 0);
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = Element.DefaultTotalPagesHint) => new(0, 0);
     internal override void Draw(DrawingContext ctx) { }
 }

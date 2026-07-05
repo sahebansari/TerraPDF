@@ -16,6 +16,12 @@ internal sealed class DrawingContext
     internal int TotalPages               { get; init; } = 1;
     internal Action<HeadingElement, int, double>? HeadingRecorder { get; init; }
 
+    /// <summary>
+    /// Invoked by <see cref="BookmarkAnchorElement"/> during the final render with
+    /// (title, parentTitle, pageNumber, topY) so anchors resolve their own positions.
+    /// </summary>
+    internal Action<string, string?, int, double>? BookmarkRecorder { get; init; }
+
     /// <summary>Returns a context repositioned to the given bounds.</summary>
     internal DrawingContext At(double x, double y, double width, double height) => new()
     {
@@ -27,6 +33,7 @@ internal sealed class DrawingContext
         DefaultTextStyle = DefaultTextStyle,
         PageNumber       = PageNumber,
         TotalPages       = TotalPages,
-        HeadingRecorder = HeadingRecorder,
+        HeadingRecorder  = HeadingRecorder,
+        BookmarkRecorder = BookmarkRecorder,
     };
 }

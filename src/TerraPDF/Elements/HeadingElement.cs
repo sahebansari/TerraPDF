@@ -16,8 +16,9 @@ internal sealed class HeadingElement : Element
         TextBlock = new TextBlock(title);
     }
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null) =>
-        TextBlock.Measure(w, h, defaultStyle);
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint) =>
+        TextBlock.Measure(w, h, defaultStyle, totalPagesHint);
 
     internal override void Draw(DrawingContext ctx)
     {

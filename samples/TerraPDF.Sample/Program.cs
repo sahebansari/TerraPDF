@@ -1,11 +1,12 @@
 using TerraPDF.Sample.Samples;
 
 
-//  TerraPDF Samples  -  PDFs from simple to complex, saved to Desktop.
+//  TerraPDF Samples  -  PDFs from simple to complex.
+//  Output directory: first command-line argument, or Desktop\SamplePDF by default.
 
 
 string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-string sampleDir = Path.Combine(desktop, "SamplePDF");
+string sampleDir = args.Length > 0 ? args[0] : Path.Combine(desktop, "SamplePDF");
 Directory.CreateDirectory(sampleDir);
 
 string imgDir    = AppContext.BaseDirectory;          // images live next to the exe

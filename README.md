@@ -11,8 +11,8 @@ A free, pure C# library designed for fast and reliable PDF generation.
 [https://terrapdf.com/](https://terrapdf.com/)
 
 
-> **New in 1.3.0:** 
-[Encryption & Password Protection](https://github.com/sahebansari/TerraPDF/blob/master/docs/encryption.md) guide — AES-128 encryption, user and owner passwords, fine-grained permission flags, and secure document protection.
+> **New in 1.4.0:** 
+[AES-256 encryption by default](https://github.com/sahebansari/TerraPDF/blob/master/docs/encryption.md), plus bytes/stream image sources, anchor-based bookmarks, and the immutable `TextStyle` callback for multi-span text.
 
 **TerraPDF** is a lightweight, zero-dependency, pure C# library for generating professional PDF 1.7 documents programmatically. 
 It provides a fluent, composable API that covers the full document-authoring lifecycle — from page layout and 
@@ -22,6 +22,7 @@ runtime packages, and no licensing restrictions.
 - No native dependencies, no third-party packages
 - Targets **.NET 8** and **.NET 9**
 - Text styling — bold, italic, bold-italic, strikethrough, underline, font size, colour
+- Three built-in font families — Helvetica, Times, Courier — via `FontFamily()`, no embedding needed
 - Configurable line-height multiplier per text block
 - Per-span formatting inside mixed-style text blocks
 - Margin and padding decorators with full unit support
@@ -41,7 +42,9 @@ runtime packages, and no licensing restrictions.
  - Conditional rendering via `ShowIf`
  - Reusable components via `IComponent`
  - Headers, footers, and page numbers
- - **AES-128 PDF encryption** — user password, owner password, and fine-grained permission flags (`PdfPermissions`) via `container.Encrypt()`
+ - **AES-256 PDF encryption by default** — user password, owner password, and fine-grained permission flags (`PdfPermissions`) via `container.Encrypt()`; AES-128 remains available for compatibility
+- **Images from bytes and streams** — `Image(byte[])` / `Image(Stream)` with transparency and deduplication
+- **Anchor-based bookmarks** — bookmark content directly to rendered elements and keep destinations accurate
  - Full **WinAnsiEncoding** character coverage
  - **Vector graphics canvas** — lines, rectangles, rounded rectangles, circles, ellipses, arbitrary Bézier paths, polygons, and grid helpers via `container.Canvas()`
  - Fluent, composable API
@@ -116,7 +119,7 @@ For complete API reference and detailed guides, visit the [docs](https://github.
 - **[Images](https://github.com/sahebansari/TerraPDF/blob/master/docs/images.md)** — PNG and JPEG embedding with sizing and alignment
 - **[Page Sizes & Units](https://github.com/sahebansari/TerraPDF/blob/master/docs/page-sizes-and-units.md)** — Built-in page sizes and unit conversions
 - **[Colors](https://github.com/sahebansari/TerraPDF/blob/master/docs/colors.md)** — Material Design color palette with shades
-- **[Encryption & Security](https://github.com/sahebansari/TerraPDF/blob/master/docs/encryption.md)** — AES-128 protection with permission flags
+- **[Encryption & Security](https://github.com/sahebansari/TerraPDF/blob/master/docs/encryption.md)** — AES-256 by default, with AES-128 compatibility mode and permission flags
 - **[Vector Graphics](https://github.com/sahebansari/TerraPDF/blob/master/docs/vector-graphics.md)** — Canvas API, shapes, paths, grids, and charts
 - **[Table of Contents](https://github.com/sahebansari/TerraPDF/blob/master/docs/table-of-contents.md)** — Automatic TOC generation from headings
 - **[Bookmarks](https://github.com/sahebansari/TerraPDF/blob/master/docs/bookmarks.md)** — PDF bookmarks and outlines

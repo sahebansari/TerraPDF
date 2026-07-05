@@ -33,13 +33,14 @@ internal sealed class Row : Element
 
     // -- Measure ---------------------------------------------------
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null)
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint)
     {
-        double[] widths = CalculateWidths(w, defaultStyle);
+        double[] widths = CalculateWidths(w, defaultStyle, totalPagesHint);
         double maxH = 0;
         for (int i = 0; i < Items.Count; i++)
         {
-            var sz = Items[i].Slot.Measure(widths[i], h, defaultStyle);
+            var sz = Items[i].Slot.Measure(widths[i], h, defaultStyle, totalPagesHint);
             if (sz.Height > maxH) maxH = sz.Height;
         }
         return new ElementSize(w, maxH);
@@ -49,7 +50,7 @@ internal sealed class Row : Element
 
     internal override void Draw(DrawingContext ctx)
     {
-        double[] widths = CalculateWidths(ctx.Width, ctx.DefaultTextStyle);
+        double[] widths = CalculateWidths(ctx.Width, ctx.DefaultTextStyle, ctx.TotalPages);
         double curX = ctx.X;
         for (int i = 0; i < Items.Count; i++)
         {
@@ -62,7 +63,8 @@ internal sealed class Row : Element
 
     // -- Helpers ---------------------------------------------------
 
-    private double[] CalculateWidths(double available, TextStyle? defaultStyle = null)
+    private double[] CalculateWidths(double available, TextStyle? defaultStyle = null,
+        int totalPagesHint = Element.DefaultTotalPagesHint)
     {
         double totalSpacing = Spacing * Math.Max(0, Items.Count - 1);
         double remaining    = available - totalSpacing;
@@ -83,7 +85,7 @@ internal sealed class Row : Element
             }
             else if (item.Type == RowItemType.Auto)
             {
-                var sz    = item.Slot.Measure(remaining, double.MaxValue, defaultStyle);
+                var sz    = item.Slot.Measure(remaining, double.MaxValue, defaultStyle, totalPagesHint);
                 widths[i] = sz.Width;
                 autoTotal += sz.Width;
             }

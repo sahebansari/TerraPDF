@@ -73,27 +73,30 @@ public sealed class UnicodeTests
 
     [Theory]
     // é (U+00E9, WinAnsi 0xE9) — Helvetica AFM: 556 units
-    [InlineData("é",  10, false, false, 5.56)]
+    [InlineData("é",  10, "Helvetica", false, false, 5.56)]
     // À (U+00C0, WinAnsi 0xC0) — Helvetica AFM: 667 units
-    [InlineData("À",  10, false, false, 6.67)]
+    [InlineData("À",  10, "Helvetica", false, false, 6.67)]
     // ü (U+00FC, WinAnsi 0xFC) — Helvetica AFM: 556 units
-    [InlineData("ü",  10, false, false, 5.56)]
+    [InlineData("ü",  10, "Helvetica", false, false, 5.56)]
     // – en-dash (U+2013, WinAnsi 0x96) — Helvetica AFM: 556 units
-    [InlineData("–",  10, false, false, 5.56)]
+    [InlineData("–",  10, "Helvetica", false, false, 5.56)]
     // … ellipsis (U+2026, WinAnsi 0x85) — Helvetica AFM: 1000 units
-    [InlineData("…",  10, false, false, 10.0)]
+    [InlineData("…",  10, "Helvetica", false, false, 10.0)]
     // ™ trade mark (U+2122, WinAnsi 0x99) — Helvetica AFM: 1000 units
-    [InlineData("™",  10, false, false, 10.0)]
+    [InlineData("™",  10, "Helvetica", false, false, 10.0)]
+    // é in Helvetica-Bold — AFM: 556 units
+    [InlineData("é",  10, "Helvetica", true,  false, 5.56)]
     // é in Times-Bold — AFM: 444 units
-    [InlineData("é",  10, true,  false, 4.44)]
+    [InlineData("é",  10, "Times",     true,  false, 4.44)]
     // é in Times-Italic — AFM: 444 units
-    [InlineData("é",  10, false, true,  4.44)]
+    [InlineData("é",  10, "Times",     false, true,  4.44)]
     // Unmappable character falls back to 500 units
-    [InlineData("中", 10, false, false, 5.0)]
+    [InlineData("中", 10, "Helvetica", false, false, 5.0)]
     public void MeasureWidthSupportsExtendedWinAnsiCharacters(
-        string text, double fontSize, bool bold, bool italic, double expectedPts)
+        string text, double fontSize, string family, bool bold, bool italic, double expectedPts)
     {
-        double actual = FontMetrics.MeasureWidth(text, fontSize, bold, italic);
+        double actual = FontMetrics.MeasureWidth(
+            text, fontSize, PdfFonts.Resolve(family), bold, italic);
         Assert.Equal(expectedPts, actual, precision: 1);
     }
 
@@ -101,7 +104,7 @@ public sealed class UnicodeTests
     public void MeasureWidthMixedAsciiAndAccentedSumsCorrectly()
     {
         // "café" = c(500) + a(556) + f(278) + é(556) = 1890 units @ 10 pt = 18.9 pt
-        double actual = FontMetrics.MeasureWidth("café", 10, false, false);
+        double actual = FontMetrics.MeasureWidth("café", 10, PdfFontFamily.Helvetica, false, false);
         Assert.Equal(18.9, actual, precision: 1);
     }
 

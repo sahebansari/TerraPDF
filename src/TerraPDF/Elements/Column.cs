@@ -17,13 +17,14 @@ internal sealed class Column : Element
 
     // -- Measure ---------------------------------------------------
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null)
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint)
     {
         double totalH   = 0;
         double maxWidth = 0;   // track natural content width for Row auto-sizing
         for (int i = 0; i < Items.Count; i++)
         {
-            var sz = Items[i].Measure(w, Math.Max(0, h - totalH), defaultStyle);
+            var sz = Items[i].Measure(w, Math.Max(0, h - totalH), defaultStyle, totalPagesHint);
             totalH += sz.Height;
             if (sz.Width > maxWidth) maxWidth = sz.Width;
             if (i < Items.Count - 1) totalH += Spacing;
@@ -46,7 +47,7 @@ internal sealed class Column : Element
             // Remaining vertical space below the current cursor position
             double rem  = Math.Max(0, ctx.Height - (curY - ctx.Y));
             // Use ctx.DefaultTextStyle so item heights are consistent with the measure pass
-            var    sz   = item.Measure(ctx.Width, rem, ctx.DefaultTextStyle);
+            var    sz   = item.Measure(ctx.Width, rem, ctx.DefaultTextStyle, ctx.TotalPages);
             item.Draw(ctx.At(ctx.X, curY, ctx.Width, sz.Height));
             curY += sz.Height;
             if (i < Items.Count - 1) curY += Spacing;

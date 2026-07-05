@@ -43,12 +43,15 @@ internal static class EncryptionShowcase
         string pathB = Path.Combine(dir, "12b_owner_only.pdf");
         string pathC = Path.Combine(dir, "12c_print_only.pdf");
         string pathD = Path.Combine(dir, "12d_fully_restricted.pdf");
+        string pathE = Path.Combine(dir, "12e_aes128_legacy.pdf");
 
-        // Generate the four protected variants
+        // Generate the protected variants (12a–d use the AES-256 default;
+        // 12e opts into legacy AES-128 for very old viewers)
         GenerateA(pathA);
         GenerateB(pathB);
         GenerateC(pathC);
         GenerateD(pathD);
+        GenerateE(pathE);
 
         // Generate the overview / showcase document
         GenerateOverview(overviewPath, pathA, pathB, pathC, pathD);
@@ -95,8 +98,8 @@ internal static class EncryptionShowcase
                         LabelValue(info.Item(), "User Password",  "user123");
                         LabelValue(info.Item(), "Owner Password", "admin123");
                         LabelValue(info.Item(), "Permissions",    "All — print, copy, edit, fill forms, accessibility");
-                        LabelValue(info.Item(), "Algorithm",      "AES-128 CBC  (PDF Standard Security Handler Rev 4)");
-                        LabelValue(info.Item(), "PDF Version",    "1.6  (minimum required for AES encryption)");
+                        LabelValue(info.Item(), "Algorithm",      "AES-256 CBC  (PDF Standard Security Handler Rev 6)");
+                        LabelValue(info.Item(), "PDF Version",    "2.0  (ISO 32000-2, required for Revision 6)");
                     });
 
                     SectionHeader(col.Item(), "What this means");
@@ -117,9 +120,10 @@ internal static class EncryptionShowcase
                     {
                         t.Span("All content streams and image data in this PDF are encrypted with ")
                          .FontColor(Muted);
-                        t.Span("AES-128 CBC").Bold().FontColor(Brand);
-                        t.Span(". Each PDF object uses a unique per-object key derived from the "
-                             + "file encryption key, the object number, and the generation number.")
+                        t.Span("AES-256 CBC").Bold().FontColor(Brand);
+                        t.Span(". The 256-bit file encryption key is protected by the SHA-2 based "
+                             + "Revision 6 key-derivation algorithm (ISO 32000-2). For very old "
+                             + "viewers, AES-128 remains available via Algorithm = EncryptionAlgorithm.Aes128.")
                          .FontColor(Muted);
                     });
 
@@ -136,6 +140,75 @@ internal static class EncryptionShowcase
             });
         }).PublishPdf(path);
         Console.WriteLine($"  [12a] Encryption showcase -> {path}");
+    }
+
+    // =========================================================================
+    //  12e — Legacy AES-128 (Revision 4) opt-in for very old viewers
+    // =========================================================================
+    private static void GenerateE(string path)
+    {
+        Document.Create(doc =>
+        {
+            doc.Encrypt(new EncryptionOptions
+            {
+                UserPassword  = "legacy123",
+                OwnerPassword = "legacyAdmin",
+                Permissions   = PdfPermissions.All,
+                Algorithm     = EncryptionAlgorithm.Aes128,
+            });
+
+            doc.MetadataTitle("TerraPDF — Legacy AES-128 Encryption");
+            doc.MetadataAuthor("TerraPDF Engineering Team");
+
+            doc.Page(page =>
+            {
+                page.Size(PageSize.A4);
+                page.Margin(2, Unit.Centimetre);
+                page.PageColor(Color.White);
+                page.DefaultTextStyle(s => s.FontSize(10));
+
+                PageHeader(page, "Legacy AES-128 — Compatibility Mode", "12e");
+                PageFooter(page);
+
+                page.Content().PaddingTop(16).Column(col =>
+                {
+                    col.Spacing(14);
+
+                    SectionHeader(col.Item(), "Document Protection Summary");
+
+                    col.Item().Background(Light).Border(0.5, GridLine).Padding(14).Column(info =>
+                    {
+                        info.Spacing(6);
+                        LabelValue(info.Item(), "User Password",  "legacy123");
+                        LabelValue(info.Item(), "Owner Password", "legacyAdmin");
+                        LabelValue(info.Item(), "Algorithm",      "AES-128 CBC  (PDF Standard Security Handler Rev 4)");
+                        LabelValue(info.Item(), "PDF Version",    "1.6  (minimum required for AES-128)");
+                    });
+
+                    SectionHeader(col.Item(), "When to use this mode");
+
+                    col.Item().Text(t =>
+                    {
+                        t.Span("TerraPDF encrypts with ").FontColor(Muted);
+                        t.Span("AES-256 (Revision 6)").Bold().FontColor(Brand);
+                        t.Span(" by default. Set ").FontColor(Muted);
+                        t.Span("Algorithm = EncryptionAlgorithm.Aes128").Bold().FontColor(Accent);
+                        t.Span(" only when documents must open in viewers released before "
+                             + "roughly 2008, which predate AES-256 support.").FontColor(Muted);
+                    });
+
+                    CodeBlock(col.Item(),
+                        "container.Encrypt(new EncryptionOptions\n"
+                      + "{\n"
+                      + "    UserPassword  = \"legacy123\",\n"
+                      + "    OwnerPassword = \"legacyAdmin\",\n"
+                      + "    Permissions   = PdfPermissions.All,\n"
+                      + "    Algorithm     = EncryptionAlgorithm.Aes128,\n"
+                      + "});");
+                });
+            });
+        }).PublishPdf(path);
+        Console.WriteLine($"  [12e] Encryption showcase -> {path}");
     }
 
     // =========================================================================

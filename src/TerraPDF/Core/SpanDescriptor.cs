@@ -51,4 +51,17 @@ public sealed class SpanDescriptor
         ArgumentException.ThrowIfNullOrWhiteSpace(hexColor);
         return Apply(s => s.FontColor(hexColor));
     }
+
+    /// <summary>
+    /// Sets the font family for this span. Supported families are the standard-14 sets
+    /// <c>"Helvetica"</c>, <c>"Times"</c>, and <c>"Courier"</c> (common aliases such as
+    /// <c>"Arial"</c>, <c>"Times New Roman"</c>, and <c>"Courier New"</c> are accepted);
+    /// unknown names fall back to Helvetica.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="family"/> is null or whitespace.</exception>
+    public SpanDescriptor FontFamily(string family)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(family);
+        return Apply(s => s.FontFamily(family));
+    }
 }

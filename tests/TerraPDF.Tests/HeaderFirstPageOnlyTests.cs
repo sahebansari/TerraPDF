@@ -10,8 +10,9 @@ public sealed class HeaderFirstPageOnlyTests
     private static byte[] Build(Action<IDocumentContainer> compose) =>
         Document.Create(compose).PublishPdf();
 
-    private static string PdfText(byte[] b) =>
-        System.Text.Encoding.Latin1.GetString(b);
+    // Content streams are Flate-compressed; inflate them so drawn-text
+    // assertions keep working (dictionary text is unaffected either way).
+    private static string PdfText(byte[] b) => PdfTestUtils.InflatedText(b);
 
     private static string PdfHeader(byte[] b) =>
         System.Text.Encoding.ASCII.GetString(b, 0, 5);

@@ -15,11 +15,12 @@ internal sealed class Padding : Element
 
     // -- Measure ---------------------------------------------------
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null)
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint)
     {
         double iw = Math.Max(0, w - Left - Right);
         double ih = Math.Max(0, h - Top  - Bottom);
-        var    sz = Inner.Measure(iw, ih, defaultStyle);
+        var    sz = Inner.Measure(iw, ih, defaultStyle, totalPagesHint);
         return new ElementSize(sz.Width + Left + Right, sz.Height + Top + Bottom);
     }
 
@@ -31,4 +32,8 @@ internal sealed class Padding : Element
             ctx.Y + Top,
             Math.Max(0, ctx.Width  - Left - Right),
             Math.Max(0, ctx.Height - Top  - Bottom)));
+
+    internal override Element? PassthroughChild => Inner;
+    internal override (double Left, double Top, double Right, double Bottom) PassthroughInsets =>
+        (Left, Top, Right, Bottom);
 }

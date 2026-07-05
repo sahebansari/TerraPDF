@@ -1,8 +1,14 @@
 # Encryption & Password Protection
 
-TerraPDF supports **AES-128 PDF encryption** using the PDF Standard Security Handler
-(Revision 4).  Encrypted documents are opened by every major PDF viewer — Adobe Acrobat,
-Chrome, Edge, Firefox, Preview, Foxit, Okular, and others.
+TerraPDF encrypts documents with **AES-256** using the PDF Standard Security
+Handler **Revision 6** (ISO 32000-2 / PDF 2.0) by default — SHA-2 based key
+derivation with no MD5 or RC4 in the chain. Encrypted documents are opened by
+every major PDF viewer — Adobe Acrobat 9+ (2008), Chrome, Edge, Firefox,
+Preview, Foxit, Okular, and others.
+
+For documents that must open in very old viewers, legacy **AES-128
+(Revision 4)** remains available via
+`Algorithm = EncryptionAlgorithm.Aes128`.
 
 No external packages are required.  The entire implementation uses
 `System.Security.Cryptography` only.
@@ -40,6 +46,7 @@ Document.Create(container =>
 | `UserPassword` | `string?` | `null` | Password required to *open* the document. `null` or empty = no open password (but content is still encrypted and permissions still enforced). |
 | `OwnerPassword` | `string?` | `null` | Password granting *full* access, bypassing all `Permissions` restrictions. When `null` a random value is used so the encryption dictionary is always valid. |
 | `Permissions` | `PdfPermissions` | `All` | Bitwise combination of permission flags that apply when the user opens with the `UserPassword`. |
+| `Algorithm` | `EncryptionAlgorithm` | `Aes256` | `Aes256` = Revision 6 (modern, PDF 2.0, default). `Aes128` = Revision 4 for viewers released before ~2008. |
 
 ---
 
@@ -119,27 +126,42 @@ container.Encrypt(new EncryptionOptions
 
 ## Technical details
 
-### Algorithm
+### AES-256 — Revision 6 (default)
 
 | Property | Value |
 |----------|-------|
 | Security Handler | PDF Standard Security Handler |
+| Revision | 6 (ISO 32000-2 §7.6.4 / PDF 2.0) |
+| Content cipher | AES-256 CBC, file encryption key used directly (V5 has no per-object keys) |
+| IV | 16-byte random (per string/stream) |
+| Padding | PKCS#7 to 16-byte boundary |
+| Key derivation | SHA-256/384/512 iterated hash (algorithm 2.B) with random salts |
+| O / U entries | 48-byte verifiers (algorithms 8 & 9) |
+| OE / UE entries | File key wrapped with AES-256 under password-derived intermediate keys |
+| Perms entry | Permission bits encrypted with the file key (algorithm 10) |
+| Passwords | UTF-8, up to 127 bytes |
+| PDF version | 2.0 (set automatically) |
+
+### AES-128 — Revision 4 (legacy opt-in)
+
+| Property | Value |
+|----------|-------|
 | Revision | 4 (PDF 1.6 / §7.6.5) |
-| Content cipher | AES-128 CBC |
-| IV | 16-byte random (per object) |
-| Padding | Zero-padding to 16-byte boundary (per PDF AES spec) |
+| Content cipher | AES-128 CBC with per-object keys (Algorithm 1 — FEK + obj/gen bytes + `sAlT`) |
 | Key derivation | MD5 + 50 rounds (PDF §7.6.3.3 Algorithm 2) |
 | O entry | Algorithm 3 — MD5 key + RC4 × 20 |
 | U entry | Algorithm 5 (Rev 4) — MD5 + RC4 × 20 |
-| Per-object key | Algorithm 1 — FEK + obj/gen bytes + `sAlT` suffix |
-| Minimum PDF version | 1.6 (set automatically when encryption is active) |
+| PDF version | 1.6 (set automatically) |
+
+> **Note on MD5/RC4:** used exclusively in the Revision 4 key-derivation steps
+> mandated by the PDF specification — never for content encryption, and not at
+> all in the Revision 6 default.
 
 ### What gets encrypted
 
 - **Content streams** — the PDF drawing operators for every page
-- **Image XObjects** — PNG and JPEG pixel data
-- All encrypted objects use a unique per-object AES-128 key derived from the
-  file encryption key, the object number, and the generation number
+- **Image XObjects** — PNG and JPEG pixel data (and alpha soft masks)
+- **Strings** — document metadata, bookmark titles, hyperlink URIs
 
 ### What is NOT encrypted (per PDF specification)
 
@@ -150,14 +172,9 @@ container.Encrypt(new EncryptionOptions
 
 ### Zero-dependency
 
-The implementation uses only:
-- `System.Security.Cryptography.Aes` — AES-128 CBC encryption
-- `System.Security.Cryptography.MD5` — PDF-mandated key derivation (§7.6.3.3)
-- `System.Security.Cryptography.RandomNumberGenerator` — IV generation
-
-> **Note on MD5:** MD5 is used exclusively for the PDF key-derivation steps that are
-> mandated by the PDF specification (§7.6.2 / §7.6.3).  It is *not* used for content
-> encryption — all page content is encrypted with AES-128 CBC.
+The implementation uses only `System.Security.Cryptography`
+(`Aes`, `SHA256`/`SHA384`/`SHA512`, `MD5` for Rev 4 only, and
+`RandomNumberGenerator`).
 
 ---
 

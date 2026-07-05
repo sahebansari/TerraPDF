@@ -1,7 +1,10 @@
 # Images
 
 TerraPDF supports **PNG** and **JPEG** image embedding with automatic aspect-ratio
-preservation.
+preservation. The format is detected from the data itself (magic bytes), so the
+file extension does not matter. In 1.4.0, images can also be supplied directly
+from `byte[]` or `Stream` instances, which is useful for embedded resources and
+generated content.
 
 ---
 
@@ -10,12 +13,40 @@ preservation.
 ### Fill available width
 
 The image scales to fill the full width of its container slot while keeping the
-original aspect ratio. Height is calculated automatically.
+original aspect ratio. Height is calculated automatically; when the available
+height is the binding constraint, both axes shrink together so the image is
+never distorted.
 
 ```csharp
 container.Image("path/to/photo.jpg");
 container.Image("path/to/diagram.png");
 ```
+
+### From bytes or a stream
+
+Images can come from embedded resources, databases, HTTP responses, or
+generated data — no temporary file needed:
+
+```csharp
+byte[] logoBytes = await httpClient.GetByteArrayAsync(logoUrl);
+container.Image(logoBytes, 120);
+
+using Stream s = assembly.GetManifestResourceStream("MyApp.logo.png")!;
+container.Image(s);            // stream is read to the end; caller disposes it
+```
+
+### Transparency
+
+RGBA PNGs keep their alpha channel — it is embedded as a PDF soft mask
+(`/SMask`), so transparent logos composite correctly over page backgrounds.
+Fully opaque images skip the mask automatically. Indexed-transparency (tRNS)
+PNGs are not supported and render opaque.
+
+### Deduplication
+
+Identical image data used on multiple pages (for example a logo in a repeated
+header) is embedded **once** and shared document-wide — file size does not grow
+with the page count.
 
 ### Fixed width
 

@@ -25,12 +25,13 @@ internal sealed class PartialBorder : Element
 
     // -- Measure ---------------------------------------------------
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null) =>
-        Inner.Measure(w, h, defaultStyle);
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint) =>
+        Inner.Measure(w, h, defaultStyle, totalPagesHint);
 
     // -- Draw ------------------------------------------------------
 
-    internal override void Draw(DrawingContext ctx)
+    internal override void DrawDecoration(DrawingContext ctx)
     {
         double x = ctx.X;
         double y = ctx.Y;
@@ -41,7 +42,14 @@ internal sealed class PartialBorder : Element
         if (BottomWidth > 0) ctx.Page.AddLine(x,     y + h, x + w, y + h, BottomColor, BottomWidth);
         if (LeftWidth   > 0) ctx.Page.AddLine(x,     y,     x,     y + h, LeftColor,   LeftWidth);
         if (RightWidth  > 0) ctx.Page.AddLine(x + w, y,     x + w, y + h, RightColor,  RightWidth);
+    }
 
+    internal override void Draw(DrawingContext ctx)
+    {
+        DrawDecoration(ctx);
         Inner.Draw(ctx);
     }
+
+    internal override Element? PassthroughChild => Inner;
+    internal override bool HasDecoration => true;
 }

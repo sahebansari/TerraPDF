@@ -34,10 +34,39 @@ public sealed class BookmarkTests
         Assert.Contains("/Outlines", pdf);
         Assert.Contains("/Type /Outlines", pdf);
         Assert.Contains("/Title (Chapter 1)", pdf);
+
+        // Only the root Outlines dictionary carries /Type (PDF 1.7 §12.3.3);
+        // outline items must not.
+        int first = pdf.IndexOf("/Type /Outlines", StringComparison.Ordinal);
+        Assert.Equal(-1, pdf.IndexOf("/Type /Outlines", first + 1, StringComparison.Ordinal));
     }
 
     [Fact]
-    public void BookmarkWithoutTopUsesFitDestination()
+    public void OutlineItemCountIncludesAllDescendants()
+    {
+        // Chapter 1 has one child (Section) which itself has one child (Subsection)
+        // ⇒ Chapter 1's /Count must be 2 (all open descendants), not 1 (direct children).
+        byte[] bytes = Build(c =>
+        {
+            c.Page(p =>
+            {
+                p.Size(PageSize.A4);
+                p.Content().Text("Hello world");
+            });
+            c.Bookmark("Chapter 1", 1);
+            c.Bookmark("Section", 1, "Chapter 1");
+            c.Bookmark("Subsection", 1, "Section");
+        });
+
+        string pdf = PdfString(bytes);
+        int chapterObj = pdf.IndexOf("/Title (Chapter 1)", StringComparison.Ordinal);
+        Assert.True(chapterObj >= 0);
+        string chapterDict = pdf[chapterObj..pdf.IndexOf("endobj", chapterObj, StringComparison.Ordinal)];
+        Assert.Contains("/Count 2", chapterDict);
+    }
+
+    [Fact]
+    public void BookmarkWithoutTopScrollsToPageTopRetainingZoom()
     {
         byte[] bytes = Build(c =>
         {
@@ -50,12 +79,14 @@ public sealed class BookmarkTests
         });
 
         string pdf = PdfString(bytes);
+        // /XYZ with null zoom retains the reader's zoom; top = page height
+        // (A4 = 841.89 pt) scrolls to the top of the page.
         Assert.Contains("/Dest [", pdf);
-        Assert.Contains("/Fit]", pdf);
+        Assert.Contains("/XYZ null 841.89 null]", pdf);
     }
 
     [Fact]
-    public void BookmarkWithTopUsesFitHDestination()
+    public void BookmarkWithTopUsesXyzDestinationWithFlippedY()
     {
         byte[] bytes = Build(c =>
         {
@@ -68,7 +99,10 @@ public sealed class BookmarkTests
         });
 
         string pdf = PdfString(bytes);
-        Assert.Contains("/FitH 150.00", pdf);
+        // Top = 150 pt from the top of an A4 page (841.89 pt) → PDF y 691.89,
+        // written as /XYZ so the current zoom is retained.
+        Assert.Contains("/XYZ null 691.89 null]", pdf);
+        Assert.DoesNotContain("/FitH", pdf);
     }
 
     [Fact]
@@ -226,6 +260,7 @@ public sealed class BookmarkTests
         string pdf = PdfString(bytes);
         Assert.Contains("/Title (Parent)", pdf);
         Assert.Contains("/Title (Child)", pdf);
-        Assert.Contains("/FitH 200.00", pdf);
+        // 200 pt from the top of an A4 page (841.89 pt) → PDF y 641.89.
+        Assert.Contains("/XYZ null 641.89 null]", pdf);
     }
 }

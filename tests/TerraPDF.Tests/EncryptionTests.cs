@@ -59,7 +59,7 @@ public sealed class EncryptionTests
         Assert.Equal("%PDF-", PdfHeader(bytes));
         Assert.True(ContainsAscii(bytes, "/Encrypt"),     "Encrypted PDF must reference /Encrypt in trailer");
         Assert.True(ContainsAscii(bytes, "/Standard"),    "Must declare /Filter /Standard");
-        Assert.True(ContainsAscii(bytes, "/AESV2"),       "Must use AES-128 (/AESV2) crypt filter");
+        Assert.True(ContainsAscii(bytes, "/AESV3"),       "Default must use AES-256 (/AESV3) crypt filter");
         Assert.True(ContainsAscii(bytes, "/StdCF"),       "Must define StdCF crypt filter");
         Assert.True(ContainsAscii(bytes, "/StmF /StdCF"), "Streams must use StdCF");
         Assert.True(ContainsAscii(bytes, "/StrF /StdCF"), "Strings must use StdCF");
@@ -68,15 +68,30 @@ public sealed class EncryptionTests
     // ── /V and /R entries ────────────────────────────────────────────────────
 
     [Fact]
-    public void WithEncryptionHasCorrectRevisionAndVersion()
+    public void DefaultEncryptionIsAes256Revision6()
     {
         byte[] bytes = SimplePage(doc => doc.Encrypt(new EncryptionOptions
         {
             UserPassword = "test",
         }));
+        Assert.True(ContainsAscii(bytes, "/V 5"),  "Must set /V 5 (AES-256)");
+        Assert.True(ContainsAscii(bytes, "/R 6"),  "Must set /R 6 (revision 6)");
+        Assert.True(ContainsAscii(bytes, "/Length 256"), "Key length must be 256 bits");
+    }
+
+    [Fact]
+    public void Aes128OptInStillProducesRevision4Dictionary()
+    {
+        byte[] bytes = SimplePage(doc => doc.Encrypt(new EncryptionOptions
+        {
+            UserPassword = "test",
+            Algorithm    = EncryptionAlgorithm.Aes128,
+        }));
         Assert.True(ContainsAscii(bytes, "/V 4"),  "Must set /V 4 (algorithm 4)");
         Assert.True(ContainsAscii(bytes, "/R 4"),  "Must set /R 4 (revision 4)");
         Assert.True(ContainsAscii(bytes, "/Length 128"), "Key length must be 128 bits");
+        Assert.True(ContainsAscii(bytes, "/AESV2"), "Must use AES-128 (/AESV2) crypt filter");
+        Assert.StartsWith("%PDF-1.6", System.Text.Encoding.ASCII.GetString(bytes, 0, 8));
     }
 
     // ── Empty user password (open without password) ──────────────────────────
@@ -296,6 +311,91 @@ public sealed class EncryptionTests
         });
         Assert.Equal("%PDF-", PdfHeader(bytes));
         Assert.True(ContainsAscii(bytes, "/Encrypt"));
+    }
+
+    // ── String objects must actually be encrypted (/StrF /StdCF) ─────────────
+
+    [Fact]
+    public void EncryptedPdfDoesNotContainPlaintextMetadataStrings()
+    {
+        const string title  = "TopSecretReportTitle";
+        const string author = "ClassifiedAuthorName";
+
+        byte[] bytes = Build(doc =>
+        {
+            doc.Encrypt(new EncryptionOptions { UserPassword = "u", OwnerPassword = "o" });
+            doc.MetadataTitle(title);
+            doc.MetadataAuthor(author);
+            doc.Page(page =>
+            {
+                page.Size(PageSize.A4);
+                page.Content().Text("body");
+            });
+        });
+
+        // The declared /StrF /StdCF means every string must be AES-encrypted;
+        // the plaintext values must not appear anywhere in the file.
+        Assert.False(ContainsAscii(bytes, title),  "Encrypted PDF leaked plaintext /Title");
+        Assert.False(ContainsAscii(bytes, author), "Encrypted PDF leaked plaintext /Author");
+    }
+
+    [Fact]
+    public void EncryptedPdfDoesNotContainPlaintextBookmarkTitles()
+    {
+        const string bookmark = "SecretChapterHeading";
+
+        byte[] bytes = Build(doc =>
+        {
+            doc.Encrypt(new EncryptionOptions { UserPassword = "u" });
+            doc.Bookmark(bookmark, 1);
+            doc.Page(page =>
+            {
+                page.Size(PageSize.A4);
+                page.Content().Text("body");
+            });
+        });
+
+        Assert.True(ContainsAscii(bytes, "/Outlines"), "Bookmarks must still be emitted");
+        Assert.False(ContainsAscii(bytes, bookmark), "Encrypted PDF leaked plaintext bookmark title");
+    }
+
+    [Fact]
+    public void EncryptedPdfDoesNotContainPlaintextHyperlinkUris()
+    {
+        const string url = "https://secret.example.com/private-path";
+
+        byte[] bytes = Build(doc =>
+        {
+            doc.Encrypt(new EncryptionOptions { UserPassword = "u" });
+            doc.Page(page =>
+            {
+                page.Size(PageSize.A4);
+                page.Content().Hyperlink(url).Text("click me");
+            });
+        });
+
+        Assert.True(ContainsAscii(bytes, "/URI"), "Link annotation must still be emitted");
+        Assert.False(ContainsAscii(bytes, url), "Encrypted PDF leaked plaintext hyperlink URI");
+    }
+
+    [Fact]
+    public void UnencryptedPdfStillContainsPlaintextStrings()
+    {
+        const string title = "PublicReportTitle";
+        const string url   = "https://example.com/public";
+
+        byte[] bytes = Build(doc =>
+        {
+            doc.MetadataTitle(title);
+            doc.Page(page =>
+            {
+                page.Size(PageSize.A4);
+                page.Content().Hyperlink(url).Text("click me");
+            });
+        });
+
+        Assert.True(ContainsAscii(bytes, title), "Unencrypted metadata must stay literal");
+        Assert.True(ContainsAscii(bytes, url),   "Unencrypted URI must stay literal");
     }
 
     // ── Output size sanity ───────────────────────────────────────────────────

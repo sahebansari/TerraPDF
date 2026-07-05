@@ -12,8 +12,11 @@ internal sealed class Container : Element, IContainer
 {
     internal Element? Child { get; set; }
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null) =>
-        Child?.Measure(w, h, defaultStyle) ?? new ElementSize(0, 0);
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint) =>
+        Child?.Measure(w, h, defaultStyle, totalPagesHint) ?? new ElementSize(0, 0);
 
     internal override void Draw(DrawingContext ctx) => Child?.Draw(ctx);
+
+    internal override Element? PassthroughChild => Child;
 }

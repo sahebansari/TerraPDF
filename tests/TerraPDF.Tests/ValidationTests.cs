@@ -207,7 +207,7 @@ public sealed class ValidationTests
             Document.Create(c => c.Page(p =>
             {
                 p.Size(PageSize.A4);
-                p.Content().Image(null!);
+                p.Content().Image((string)null!);
             })));
 
     [Fact]

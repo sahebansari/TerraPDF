@@ -11,7 +11,8 @@ internal sealed class Line : Element
 
     // -- Measure ---------------------------------------------------
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null) =>
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint) =>
         Vertical ? new ElementSize(LineWidth, h) : new ElementSize(w, LineWidth);
 
     // -- Draw ------------------------------------------------------

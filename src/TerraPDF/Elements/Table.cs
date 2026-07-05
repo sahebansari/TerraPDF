@@ -78,7 +78,8 @@ internal sealed class Table : Element
 
     // -- Row heights -----------------------------------------------
 
-    internal double[] GetRowHeights(double[] colWidths, TextStyle? defaultStyle = null)
+    internal double[] GetRowHeights(double[] colWidths, TextStyle? defaultStyle = null,
+        int totalPagesHint = Element.DefaultTotalPagesHint)
     {
         int rowCount = Cells.Count > 0
             ? Cells.Max(c => c.Row + c.RowSpan - 1)
@@ -93,7 +94,7 @@ internal sealed class Table : Element
             for (int c = cell.Column - 1; c < cell.Column - 1 + cell.ColumnSpan && c < colWidths.Length; c++)
                 cellWidth += colWidths[c];
 
-            var sz = cell.Slot.Measure(cellWidth, double.MaxValue, defaultStyle);
+            var sz = cell.Slot.Measure(cellWidth, double.MaxValue, defaultStyle, totalPagesHint);
             int r  = cell.Row - 1;
             if (r < heights.Length && sz.Height > heights[r])
                 heights[r] = sz.Height;
@@ -104,10 +105,11 @@ internal sealed class Table : Element
 
     // -- Measure ---------------------------------------------------
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null)
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint)
     {
         var colWidths  = GetColumnWidths(w);
-        var rowHeights = GetRowHeights(colWidths, defaultStyle);
+        var rowHeights = GetRowHeights(colWidths, defaultStyle, totalPagesHint);
         return new ElementSize(w, rowHeights.Sum());
     }
 
@@ -116,7 +118,7 @@ internal sealed class Table : Element
     internal override void Draw(DrawingContext ctx)
     {
         var colWidths  = GetColumnWidths(ctx.Width);
-        var rowHeights = GetRowHeights(colWidths);
+        var rowHeights = GetRowHeights(colWidths, totalPagesHint: ctx.TotalPages);
         var allRows    = Enumerable.Range(0, rowHeights.Length).ToList();
         DrawRows(ctx, colWidths, rowHeights, allRows);
     }

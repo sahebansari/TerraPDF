@@ -21,7 +21,8 @@ internal sealed class CanvasElement : Element
 
     // ── Measure ─────────────────────────────────────────────────────────────
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null)
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint)
     {
         // Inject allocated size so Grid() can use it during the configure callback
         _canvas.AllocatedWidth  = w;

@@ -22,12 +22,13 @@ internal sealed class RoundedBorder : Element
 
     // -- Measure ---------------------------------------------------
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null) =>
-        Inner.Measure(w, h, defaultStyle);
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint) =>
+        Inner.Measure(w, h, defaultStyle, totalPagesHint);
 
     // -- Draw ------------------------------------------------------
 
-    internal override void Draw(DrawingContext ctx)
+    internal override void DrawDecoration(DrawingContext ctx)
     {
         if (FillColor.HasValue)
         {
@@ -41,7 +42,14 @@ internal sealed class RoundedBorder : Element
                 ctx.X, ctx.Y, ctx.Width, ctx.Height,
                 Radius, Color, LineWidth);
         }
+    }
 
+    internal override void Draw(DrawingContext ctx)
+    {
+        DrawDecoration(ctx);
         Inner.Draw(ctx);
     }
+
+    internal override Element? PassthroughChild => Inner;
+    internal override bool HasDecoration => true;
 }

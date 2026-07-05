@@ -30,16 +30,14 @@ internal sealed class TextBlock : Element
     internal TextBlock(string text) => Spans.Add(new LiteralSpan { Text = text });
     internal TextBlock() { }
 
-    private TextStyle Resolve(DrawingContext ctx) => ctx.DefaultTextStyle.MergeWith(SpanStyle);
-
     // -- Tokenisation ------------------------------------------------------
 
     /// <summary>
     /// A single word-level unit ready for line-packing.
-    /// <c>Text</c> is pre-resolved; page-number spans carry a placeholder during measure
-    /// and the real value during draw.
+    /// <c>Text</c> carries the page-count placeholder for page-number spans;
+    /// the actual value is substituted at draw time via the flags.
     /// </summary>
-    private readonly record struct TextToken(
+    internal readonly record struct TextToken(
         string    Text,
         TextStyle Style,
         bool      IsPageNumber,
@@ -102,12 +100,13 @@ internal sealed class TextBlock : Element
 
     private static double TokenWidth(in TextToken t) =>
         FontMetrics.MeasureWidth(t.Text, t.Style.Size ?? 12,
+            PdfFonts.Resolve(t.Style.Family),
             t.Style.IsBold ?? false, t.Style.IsItalic ?? false);
 
     // -- Line building -----------------------------------------------------
 
     /// <summary>One wrapped line and whether it ends a paragraph (last line / hard-break line).</summary>
-    private readonly record struct WrappedLine(List<TextToken> Tokens, bool IsLastInParagraph);
+    internal readonly record struct WrappedLine(List<TextToken> Tokens, bool IsLastInParagraph);
 
     /// <summary>
     /// Greedily packs tokens into lines no wider than <paramref name="availableWidth"/>.
@@ -165,15 +164,30 @@ internal sealed class TextBlock : Element
         return line[..(last + 1)];
     }
 
-    // -- Measure ---------------------------------------------------
+    // -- Measure / line layout --------------------------------------
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null)
+    /// <summary>
+    /// Tokenizes and wraps this block's text for the given width, using the
+    /// document's page-count hint as the placeholder for page-number spans
+    /// (the actual values are substituted at draw time).  Shared by
+    /// <see cref="Measure"/>, <see cref="Draw"/>, and the pagination engine's
+    /// line-splitting path, so all three always agree on line breaks.
+    /// </summary>
+    internal (List<WrappedLine> Lines, TextStyle Resolved, double LineHeight) LayoutLines(
+        double w, TextStyle? defaultStyle, int totalPagesHint)
     {
-        TextStyle effective = (defaultStyle ?? TextStyle.Default).MergeWith(SpanStyle);
-        double    lineH     = (effective.Size ?? 12) * (effective.LineHeightMultiplier ?? 1.4);
+        TextStyle resolved = (defaultStyle ?? TextStyle.Default).MergeWith(SpanStyle);
+        double    lineH    = (resolved.Size ?? 12) * (resolved.LineHeightMultiplier ?? 1.4);
 
-        var tokens = Tokenize(effective, "00", "00");
-        var lines  = BuildLines(tokens, w);
+        string placeholder = totalPagesHint.ToString(CultureInfo.InvariantCulture);
+        var tokens = Tokenize(resolved, placeholder, placeholder);
+        return (BuildLines(tokens, w), resolved, lineH);
+    }
+
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint)
+    {
+        var (lines, _, lineH) = LayoutLines(w, defaultStyle, totalPagesHint);
 
         // Return the width of the widest line so that container-level alignment elements
         // (AlignCenter, AlignRight) can compute the correct offset.
@@ -184,61 +198,103 @@ internal sealed class TextBlock : Element
         return new ElementSize(contentW, lines.Count * lineH);
     }
 
-    private static void DrawToken(DrawingContext ctx, in TextToken token, double x, double lineY)
+    /// <summary>A pending underline/strikethrough stroke, drawn after the line's text object closes.</summary>
+    private readonly record struct DecorationStroke(double X, double Y, double Width, PdfColor Color, double LineWidth);
+
+    /// <summary>
+    /// Shows one token inside the currently open text object and queues its
+    /// underline/strikethrough strokes (graphics operators are illegal inside
+    /// <c>BT…ET</c>, so they are flushed after the text object closes).
+    /// </summary>
+    private static void DrawToken(DrawingContext ctx, in TextToken token, double x, double lineY,
+        List<DecorationStroke> decorations)
     {
         double sf  = token.Style.Size    ?? 12;
         string sh  = token.Style.Color   ?? "#000000";
         bool   sb  = token.Style.IsBold  ?? false;
         bool   si  = token.Style.IsItalic ?? false;
         var    sc  = PdfColor.FromHex(sh);
-        var    sf2 = (sb, si) switch
-        {
-            (true,  true)  => StandardFont.TimesBoldItalic,
-            (true,  false) => StandardFont.TimesBold,
-            (false, true)  => StandardFont.TimesItalic,
-            _              => StandardFont.Helvetica,
-        };
+        var    fam = PdfFonts.Resolve(token.Style.Family);
 
         double bl = lineY + sf;
-        double tw = FontMetrics.MeasureWidth(token.Text, sf, sb, si);
+        double tw = FontMetrics.MeasureWidth(token.Text, sf, fam, sb, si);
 
-        ctx.Page.AddText(token.Text, x, bl, sf, sc, sf2);
+        ctx.Page.ShowTextAt(token.Text, x, bl, sf, sc, fam, sb, si);
 
         if (token.Style.IsStrikethrough ?? false)
-        {
-            double strikeY = bl - sf * 0.35;
-            ctx.Page.AddLine(x, strikeY, x + tw, strikeY, sc, lineWidth: sf * 0.07);
-        }
+            decorations.Add(new DecorationStroke(x, bl - sf * 0.35, tw, sc, sf * 0.07));
 
         if (token.Style.IsUnderline ?? false)
-        {
-            double underlineY = bl + sf * 0.12;
-            ctx.Page.AddLine(x, underlineY, x + tw, underlineY, sc, lineWidth: sf * 0.07);
-        }
+            decorations.Add(new DecorationStroke(x, bl + sf * 0.12, tw, sc, sf * 0.07));
     }
 
     // -- Draw ------------------------------------------------------
 
+    /// <summary>
+    /// Replaces the layout-time page-number placeholder with the actual value
+    /// for the page being drawn.
+    /// </summary>
+    private static TextToken ResolveDynamicText(in TextToken t, DrawingContext ctx)
+    {
+        if (t.IsPageNumber)
+            return t with { Text = ctx.PageNumber.ToString(CultureInfo.InvariantCulture) };
+        if (t.IsTotalPages)
+            return t with { Text = ctx.TotalPages.ToString(CultureInfo.InvariantCulture) };
+        return t;
+    }
+
     internal override void Draw(DrawingContext ctx)
     {
-        TextStyle resolved  = Resolve(ctx);
-        double    lineH     = (resolved.Size ?? 12) * (resolved.LineHeightMultiplier ?? 1.4);
-        var       alignment = resolved.Alignment ?? TextAlignment.Left;
+        var (lines, resolved, lineH) = LayoutLines(ctx.Width, ctx.DefaultTextStyle, ctx.TotalPages);
+        DrawLines(ctx, lines, resolved, lineH);
+    }
 
-        string pageNum    = ctx.PageNumber.ToString(CultureInfo.InvariantCulture);
-        string totalPages = ctx.TotalPages.ToString(CultureInfo.InvariantCulture);
-
-        var tokens = Tokenize(resolved, pageNum, totalPages);
-        var lines  = BuildLines(tokens, ctx.Width);
+    /// <summary>
+    /// Draws pre-wrapped lines starting at <c>ctx.Y</c>, honouring per-line
+    /// alignment/justification.  Also used by <see cref="TextBlockSlice"/> to
+    /// draw a page-sized subrange of a split paragraph.
+    /// </summary>
+    internal static void DrawLines(DrawingContext ctx, List<WrappedLine> lines,
+        TextStyle resolved, double lineH)
+    {
+        var alignment = resolved.Alignment ?? TextAlignment.Left;
 
         double curY = ctx.Y;
-        foreach (var (lineTokens, isLastInParagraph) in lines)
+        var decorations = new List<DecorationStroke>();
+
+        foreach (var (rawTokens, isLastInParagraph) in lines)
         {
+            // Substitute the actual page numbers for placeholder tokens before
+            // widths are computed, so alignment uses the drawn text's width.
+            var lineTokens = rawTokens;
+            for (int t = 0; t < rawTokens.Count; t++)
+            {
+                if (rawTokens[t].IsPageNumber || rawTokens[t].IsTotalPages)
+                {
+                    lineTokens = rawTokens.Select(tok => ResolveDynamicText(tok, ctx)).ToList();
+                    break;
+                }
+            }
+
             // Determine the effective alignment for this line:
             // the last line of a justified paragraph falls back to left.
             var lineAlignment = (alignment == TextAlignment.Justify && isLastInParagraph)
                 ? TextAlignment.Left
                 : alignment;
+
+            // One text object per line; opened lazily so empty lines emit nothing.
+            bool textOpen = false;
+            decorations.Clear();
+
+            void Show(in TextToken token, double x)
+            {
+                if (!textOpen)
+                {
+                    ctx.Page.BeginTextObject();
+                    textOpen = true;
+                }
+                DrawToken(ctx, token, x, curY, decorations);
+            }
 
             if (lineAlignment == TextAlignment.Justify)
             {
@@ -252,7 +308,7 @@ internal sealed class TextBlock : Element
                 int    wordIdx = 0;
                 foreach (var token in words)
                 {
-                    DrawToken(ctx, token, curX, curY);
+                    Show(token, curX);
                     curX += TokenWidth(token);
                     if (wordIdx < gapCount)
                         curX += extra;
@@ -273,12 +329,48 @@ internal sealed class TextBlock : Element
                 foreach (var token in lineTokens)
                 {
                     if (!string.IsNullOrEmpty(token.Text))
-                        DrawToken(ctx, token, curX, curY);
+                        Show(token, curX);
                     curX += TokenWidth(token);
                 }
             }
 
+            if (textOpen)
+                ctx.Page.EndTextObject();
+
+            // Underline/strikethrough are graphics operators — draw them after
+            // the text object closes, at the exact per-token coordinates.
+            foreach (var s in decorations)
+                ctx.Page.AddLine(s.X, s.Y, s.X + s.Width, s.Y, s.Color, s.LineWidth);
+
             curY += lineH;
         }
     }
+}
+
+/// <summary>
+/// A page-sized subrange of a split <see cref="TextBlock"/>'s wrapped lines,
+/// produced by the pagination engine when a paragraph is taller than the
+/// remaining page.  Follows the same pattern as <see cref="TableSlice"/>:
+/// the lines were wrapped once at layout time, so every slice agrees on
+/// line breaks with the measured whole.
+/// </summary>
+internal sealed class TextBlockSlice : Element
+{
+    private readonly List<TextBlock.WrappedLine> _lines;
+    private readonly TextStyle _resolved;
+    private readonly double    _lineHeight;
+
+    internal TextBlockSlice(List<TextBlock.WrappedLine> lines, TextStyle resolved, double lineHeight)
+    {
+        _lines      = lines;
+        _resolved   = resolved;
+        _lineHeight = lineHeight;
+    }
+
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint) =>
+        new(w, _lines.Count * _lineHeight);
+
+    internal override void Draw(DrawingContext ctx) =>
+        TextBlock.DrawLines(ctx, _lines, _resolved, _lineHeight);
 }

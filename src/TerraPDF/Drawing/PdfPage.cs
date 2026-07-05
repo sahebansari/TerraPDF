@@ -4,17 +4,6 @@ using TerraPDF.Helpers;
 
 namespace TerraPDF.Drawing;
 
-/// <summary>Built-in PDF fonts available for rendering.</summary>
-internal enum StandardFont
-{
-    Helvetica,        // F1 - normal
-    TimesBold,        // F2 - bold
-    Courier,          // F3 - monospace
-    HelveticaOblique, // F4 - italic (non-bold)
-    TimesBoldItalic,  // F5 - bold + italic
-    TimesItalic,      // F6 - italic (non-bold, Times face)
-}
-
 /// <summary>
 /// Represents a single page and accumulates PDF content-stream operators.
 /// All public coordinates use a top-left origin (Y increases downward).
@@ -33,30 +22,75 @@ internal sealed class PdfPage
     }
 
     // --------------------------------------------------------------
-    //  Drawing operations (primitive overloads - used by new API)
+    //  Text objects (BeginTextObject … ShowTextAt* … EndTextObject)
     // --------------------------------------------------------------
 
-    internal void AddText(string text, double x, double y, double fontSize,
-        PdfColor color, StandardFont font = StandardFont.Helvetica)
+    // State inside the current text object. Font/colour are re-emitted only
+    // when they change between ShowTextAt calls; the Td origin is tracked so
+    // each positioning operator is a small relative move.
+    private string?   _textFontAlias;
+    private double    _textFontSize;
+    private PdfColor? _textColor;
+    private double    _textTdX;
+    private double    _textTdY;
+
+    /// <summary>
+    /// Opens a text object (<c>BT</c>). All state is reset — the PDF text
+    /// matrix resets at BT, and resetting font/colour too keeps the tracker
+    /// immune to graphics-state changes made by non-text operators in between.
+    /// </summary>
+    internal void BeginTextObject()
     {
-        string fontAlias = font switch
-        {
-            StandardFont.TimesBold        => "F2",
-            StandardFont.Courier          => "F3",
-            StandardFont.HelveticaOblique => "F4",
-            StandardFont.TimesBoldItalic  => "F5",
-            StandardFont.TimesItalic      => "F6",
-            _                             => "F1"
-        };
-        // PDF uses a bottom-left origin, so flip Y: pdfY = pageHeight - callerY
-        double pdfY = Height - y;
         _ops.Append("BT\n");
-        _ops.Append(CultureInfo.InvariantCulture, $"{C(color.R)} {C(color.G)} {C(color.B)} rg\n");
-        _ops.Append(CultureInfo.InvariantCulture, $"/{fontAlias} {F(fontSize)} Tf\n");
-        _ops.Append(CultureInfo.InvariantCulture, $"{F(x)} {F(pdfY)} Td\n");
-        _ops.Append(CultureInfo.InvariantCulture, $"({EscapeForPdfString(text)}) Tj\n");
-        _ops.Append("ET\n");
+        _textFontAlias = null;
+        _textFontSize  = 0;
+        _textColor     = null;
+        _textTdX       = 0;
+        _textTdY       = 0;
     }
+
+    /// <summary>
+    /// Shows <paramref name="text"/> with its baseline at (<paramref name="x"/>,
+    /// <paramref name="y"/>) in top-left-origin coordinates.  Must be called
+    /// between <see cref="BeginTextObject"/> and <see cref="EndTextObject"/>.
+    /// Font and colour operators are emitted only when they differ from the
+    /// previous call in the same text object.
+    /// </summary>
+    internal void ShowTextAt(string text, double x, double y, double fontSize,
+        PdfColor color, PdfFontFamily family = PdfFontFamily.Helvetica,
+        bool bold = false, bool italic = false)
+    {
+        if (_textColor is null || !_textColor.Value.Equals(color))
+        {
+            _ops.Append(CultureInfo.InvariantCulture, $"{C(color.R)} {C(color.G)} {C(color.B)} rg\n");
+            _textColor = color;
+        }
+
+        string fontAlias = PdfFonts.Alias(family, bold, italic);
+        if (fontAlias != _textFontAlias || fontSize != _textFontSize)
+        {
+            _ops.Append(CultureInfo.InvariantCulture, $"/{fontAlias} {F(fontSize)} Tf\n");
+            _textFontAlias = fontAlias;
+            _textFontSize  = fontSize;
+        }
+
+        // Td moves relative to the previous text-line origin. Deltas are taken
+        // between rounded absolute positions so rounding never accumulates.
+        double pdfX = Math.Round(x, 2);
+        double pdfY = Math.Round(Height - y, 2);
+        _ops.Append(CultureInfo.InvariantCulture, $"{F(pdfX - _textTdX)} {F(pdfY - _textTdY)} Td\n");
+        _textTdX = pdfX;
+        _textTdY = pdfY;
+
+        _ops.Append(CultureInfo.InvariantCulture, $"({EscapeForPdfString(text)}) Tj\n");
+    }
+
+    /// <summary>Closes the current text object (<c>ET</c>).</summary>
+    internal void EndTextObject() => _ops.Append("ET\n");
+
+    // --------------------------------------------------------------
+    //  Drawing operations (primitive overloads - used by new API)
+    // --------------------------------------------------------------
 
     internal void AddLine(double x1, double y1, double x2, double y2,
         PdfColor color, double lineWidth = 1)
@@ -341,12 +375,13 @@ internal sealed class PdfPage
     /// <summary>
     /// Images registered for this page, keyed by alias.
     /// <list type="bullet">
-    ///   <item>PNG  - <c>IsJpeg = false</c>, <c>Data</c> = flat decoded RGB bytes, <c>Components = 3</c>.</item>
+    ///   <item>PNG  - <c>IsJpeg = false</c>, <c>Data</c> = flat decoded RGB bytes, <c>Components = 3</c>,
+    ///          <c>Alpha</c> = optional 8-bit alpha channel for a /SMask.</item>
     ///   <item>JPEG - <c>IsJpeg = true</c>,  <c>Data</c> = raw JPEG file bytes (no decoding needed).</item>
     /// </list>
     /// Populated by <see cref="DrawImage"/> and consumed by <see cref="PdfDocument"/>.
     /// </summary>
-    internal readonly Dictionary<string, (byte[] Data, int Width, int Height, bool IsJpeg, int Components)> ImageObjects = new();
+    internal readonly Dictionary<string, (byte[] Data, int Width, int Height, bool IsJpeg, int Components, byte[]? Alpha)> ImageObjects = new();
 
     /// <summary>
     /// Registers the image data under <paramref name="alias"/> (if not already present) and
@@ -362,12 +397,13 @@ internal sealed class PdfPage
     /// <param name="drawH">Rendered height in PDF points.</param>
     /// <param name="isJpeg">True for JPEG (raw file bytes, DCTDecode); false for PNG (decoded RGB, FlateDecode).</param>
     /// <param name="components">Colour component count: 1 = grayscale, 3 = RGB, 4 = CMYK.</param>
+    /// <param name="alpha">Optional 8-bit alpha channel (one byte per pixel) emitted as a /SMask.</param>
     internal void DrawImage(string alias, byte[] data, int imgW, int imgH,
         double x, double y, double drawW, double drawH,
-        bool isJpeg = false, int components = 3)
+        bool isJpeg = false, int components = 3, byte[]? alpha = null)
     {
         // Register image data once per alias per page
-        ImageObjects.TryAdd(alias, (data, imgW, imgH, isJpeg, components));
+        ImageObjects.TryAdd(alias, (data, imgW, imgH, isJpeg, components, alpha));
 
         // PDF images are placed via a Current Transformation Matrix (CTM):
         //   [scaleX 0 0 scaleY originX originY] cm

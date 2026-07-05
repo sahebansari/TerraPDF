@@ -16,7 +16,9 @@ internal sealed class BookmarkInfo
 
     /// <summary>
     /// Optional Y coordinate (in points from the top of the page) where the view
-    /// should be positioned when the bookmark is activated. If null, a /Fit destination is used.
+    /// should be positioned when the bookmark is activated.  If null, the view
+    /// scrolls to the top of the page.  Either way the destination is written as
+    /// <c>/XYZ</c> with null zoom, so the reader's current zoom level is retained.
     /// </summary>
     public double? Top { get; set; }
 

@@ -19,7 +19,8 @@ namespace TerraPDF.Elements;
 internal sealed class PageBreak : Element
 {
     /// <summary>A page-break occupies no space in the layout.</summary>
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null) =>
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint) =>
         new(0, 0);
 
     /// <summary>A page-break renders nothing; the actual page transition is

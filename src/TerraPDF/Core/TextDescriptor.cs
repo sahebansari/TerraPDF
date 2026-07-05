@@ -33,17 +33,34 @@ public sealed class TextDescriptor
         return this;
     }
 
-    /// <summary>Renders text in bold (Times-Bold).</summary>
+    /// <summary>Renders text in the bold variant of the current font family.</summary>
     public TextDescriptor Bold()
     {
         _element.SpanStyle = (_element.SpanStyle ?? new TextStyle()).Bold();
         return this;
     }
 
-    /// <summary>Renders text in semi-bold (mapped to bold in the built-in font set).</summary>
+    /// <summary>
+    /// Renders text in semi-bold.  The built-in standard-14 fonts have no semi-bold
+    /// weight, so this maps to <see cref="Bold"/>.
+    /// </summary>
     public TextDescriptor SemiBold()
     {
         _element.SpanStyle = (_element.SpanStyle ?? new TextStyle()).SemiBold();
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the font family. Supported families are the standard-14 sets
+    /// <c>"Helvetica"</c>, <c>"Times"</c>, and <c>"Courier"</c> (common aliases such as
+    /// <c>"Arial"</c>, <c>"Times New Roman"</c>, and <c>"Courier New"</c> are accepted);
+    /// unknown names fall back to Helvetica.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="family"/> is null or whitespace.</exception>
+    public TextDescriptor FontFamily(string family)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(family);
+        _element.SpanStyle = (_element.SpanStyle ?? new TextStyle()).FontFamily(family);
         return this;
     }
 
@@ -110,18 +127,18 @@ public sealed class TextDescriptor
 
     // -- Multi-span overloads --------------------------------------
 
-    /// <summary>Appends a literal text span with an optional style override.</summary>
+    /// <summary>
+    /// Appends a literal text span with an optional style override.
+    /// <see cref="TextStyle"/> is immutable — the callback receives a fresh style and
+    /// must return the configured one, e.g. <c>t.Span("hi", s =&gt; s.Bold().FontSize(9))</c>.
+    /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="text"/> is <c>null</c>.</exception>
-    public SpanDescriptor Span(string text, Action<TextStyle>? styleAction = null)
+    public SpanDescriptor Span(string text, Func<TextStyle, TextStyle>? styleAction = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         var span = new LiteralSpan { Text = text };
         if (styleAction is not null)
-        {
-            var s = new TextStyle();
-            styleAction(s);
-            span.Style = s;
-        }
+            span.Style = styleAction(new TextStyle());
         _element.Spans.Add(span);
         return new SpanDescriptor(span);
     }

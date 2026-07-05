@@ -28,6 +28,7 @@ container.Text("Section Heading")
 | `.Strikethrough()` | Horizontal strikethrough line |
 | `.Underline()` | Underline beneath the text |
 | `.FontSize(double)` | Font size in PDF points |
+| `.FontFamily(string)` | Font family: `"Helvetica"` (default), `"Times"`, or `"Courier"` |
 | `.LineHeight(double)` | Line-height multiplier (e.g. `1.0` = tight, `1.4` = default, `2.0` = double-spaced) |
 | `.FontColor(string)` | Hex colour, e.g. `"#1a4a8a"` or `Color.Red.Medium` |
 | `.AlignLeft()` | Left-align (default) |
@@ -35,22 +36,40 @@ container.Text("Section Heading")
 | `.AlignRight()` | Right-align |
 | `.Justify()` | Justify all lines except the last |
 
+### Font families
+
+TerraPDF ships the three standard-14 font families, each in regular, **bold**,
+*italic*, and ***bold-italic*** — no font files or embedding required:
+
+```csharp
+container.Text("Sans-serif (default)");                       // Helvetica
+container.Text("Serif body text").FontFamily("Times");        // Times-Roman
+container.Text("Code sample").FontFamily("Courier");          // Courier (monospaced)
+container.Text("Serif heading").FontFamily("Times").Bold();   // Times-Bold
+```
+
+`Bold()` and `Italic()` always stay within the selected family — bold Helvetica
+renders **Helvetica-Bold**, not a serif face. Common aliases are accepted
+(`"Arial"` → Helvetica, `"Times New Roman"` → Times, `"Courier New"` → Courier);
+unknown names fall back to Helvetica.
+
 ---
 
 ## Multi-Span Text
 
-Use the `Action<TextDescriptor>` overload to compose a text block from multiple
-independently styled spans.
+Use the `Func<TextStyle, TextStyle>` overload to compose a text block from multiple
+independently styled spans. Because `TextStyle` is immutable, the callback receives
+a fresh style object and must return the configured style.
 
 ```csharp
 container.Text(t =>
 {
     t.Span("Normal  ");
-    t.Span("Bold  ").Bold();
-    t.Span("Italic  ").Italic();
-    t.Span("Struck  ").Strikethrough();
-    t.Span("Coloured  ").FontColor(Color.Red.Medium);
-    t.Span("Large").FontSize(16).FontColor("#1a4a8a");
+    t.Span("Bold  ", s => s.Bold());
+    t.Span("Italic  ", s => s.Italic());
+    t.Span("Struck  ", s => s.Strikethrough());
+    t.Span("Coloured  ", s => s.FontColor(Color.Red.Medium));
+    t.Span("Large", s => s.FontSize(16).FontColor("#1a4a8a"));
 });
 ```
 
@@ -68,6 +87,7 @@ container.Text(t =>
 | `.Strikethrough()` | Strikethrough for this span |
 | `.Underline()` | Underline for this span |
 | `.FontSize(double)` | Font size for this span |
+| `.FontFamily(string)` | Font family for this span (`"Helvetica"`, `"Times"`, `"Courier"`) |
 | `.FontColor(string)` | Text colour for this span |
 
 ---

@@ -6,6 +6,128 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-07-04
+
+### Added (encryption)
+- **AES-256 encryption (Standard Security Handler Revision 6)** — now the
+  **default** algorithm. SHA-2 based key derivation (algorithm 2.B) with random
+  salts, 48-byte /O and /U verifiers, /OE + /UE key wrapping, and an encrypted
+  /Perms entry; documents are emitted as PDF 2.0 and open in every mainstream
+  viewer since ~2008 (Acrobat 9+, Chrome, Edge, Firefox, Preview, …).
+- `EncryptionOptions.Algorithm` (`EncryptionAlgorithm.Aes256` |
+  `EncryptionAlgorithm.Aes128`). **Behavioral note:** existing callers now get
+  AES-256 by default; set `Algorithm = EncryptionAlgorithm.Aes128` to keep the
+  legacy Revision 4 output for very old viewers.
+
+### Added (content features)
+- **Images from bytes and streams** — `container.Image(byte[])` and
+  `container.Image(Stream)` overloads (with optional width), so images can come
+  from embedded resources, databases, or generated data. The format (PNG/JPEG)
+  is now detected from the data's magic bytes rather than the file extension.
+- **PNG transparency** — RGBA PNGs keep their alpha channel, emitted as a
+  `/SMask` soft mask (fully opaque images skip the mask). Indexed-transparency
+  (tRNS) PNGs still render opaque.
+- **Image deduplication** — identical image data used on multiple pages is
+  embedded once and shared document-wide.
+- **Anchor-based bookmarks** — `container.Bookmark("Title")` (optionally with a
+  `parentTitle` for nesting) marks its content as an outline destination; the
+  page number and vertical position are resolved automatically during render.
+  The page-number-based `Bookmark(title, pageNumber)` API remains available.
+- **Paragraph splitting across pages** — a text block taller than the remaining
+  page now flows onto the next page, split between wrapped lines, instead of
+  overflowing off the bottom. Applies to plain/decorated text items; content
+  wrapped in hyperlinks and headings intentionally keeps the previous behaviour.
+
+### Fixed (content features)
+- **Bookmark destinations keep the reader's zoom and land accurately.**
+  Bookmarks previously emitted `/Fit`/`/FitH` destinations (which force a zoom
+  change) with an un-flipped Y coordinate (top-origin written where PDF expects
+  bottom-origin), so clicking an entry zoomed the page and scrolled to the
+  wrong position. Destinations are now `/XYZ null top null` — zoom-retaining —
+  with the Y correctly converted to PDF coordinates.
+- **Height-constrained images keep their aspect ratio** — previously only the
+  height was clamped, horizontally squashing tall images.
+- **TOC heading scan traverses wrappers** — headings inside decorators
+  (`Padding`, `Background`, …), hyperlinks, or bookmark anchors were invisible
+  to the Table of Contents scan but still recorded during render, which could
+  crash TOC generation with mismatched entry lists.
+
+### Changed (output size & memory)
+- **Content streams are Flate-compressed** (`/Filter /FlateDecode`), matching how
+  PNG image data was already stored. Typical multi-page text documents shrink
+  substantially; combined with encryption the stream is compressed first, then
+  encrypted (PDF §7.6.1).
+- **Streamed serialization.** The writer no longer buffers the whole file in a
+  `MemoryStream` to compute xref offsets — it writes directly to the output
+  stream (buffered, non-seekable-safe) while counting bytes, so peak memory is
+  no longer ~2× the file size.
+- **Per-line text objects.** Text is emitted as one `BT…ET` block per line with
+  font/colour set only when they change, instead of a full text object per
+  word — significantly smaller content streams, no visual change.
+
+### Changed (layout engine)
+- **Fragment-based layout engine.** Pagination decisions are now made once, in a
+  single layout pass that produces per-page fragments consumed by both page
+  counting and rendering — the previous duplicated count/render implementations
+  (which could drift and disagree) have been removed. No visible output change
+  except the decorator fix below.
+- **Decorators now render on every page of a split column.** A `Background`,
+  `Border`, `RoundedBorder`/`RoundedBox`, or per-edge border wrapped around
+  paginating content previously drew on no page at all; it now draws its chrome
+  on each page, covering that page's content area.
+- **Thread safety.** Concurrent document generation is now safe: the static
+  heading recorder used by the Table of Contents pass has been replaced with
+  per-render state, so parallel `PublishPdf` calls no longer cross-contaminate
+  TOC entries.
+
+### Added
+- **`FontFamily(string)`** on `TextDescriptor`, `SpanDescriptor`, and `TextStyle` now
+  actually selects a font (it was previously a silent no-op). Supported families are the
+  standard-14 sets **Helvetica**, **Times**, and **Courier**; common aliases
+  (`"Arial"`, `"Times New Roman"`, `"Courier New"`) are accepted and unknown names fall
+  back to Helvetica. All 12 family/weight/slant variants (F1–F12) are registered in
+  every document.
+- Accurate Adobe AFM width tables for **Helvetica-Bold**, **Times-Roman**, and
+  **Times-BoldItalic**; Courier measured at its fixed 600-unit advance.
+
+### Fixed
+- **Bold/italic no longer switch typeface.** `Bold()` previously rendered Times-Bold and
+  `Italic()` Times-Italic even in Helvetica text; they now select the bold/oblique
+  variant of the *current* family (e.g. Helvetica → Helvetica-Bold). Documents render
+  visibly different (correct) from 1.3.0.
+- **Document metadata now shows in viewers.** The Info dictionary is referenced from the
+  PDF *trailer* (`/Info`, per spec §7.5.5) instead of the Catalog, where conforming
+  readers never looked for it.
+- **Encrypted documents no longer leak or corrupt strings.** Metadata values, bookmark
+  titles, and hyperlink URIs are now AES-encrypted with their owning object's key,
+  matching the declared `/StrF /StdCF` crypt filter. Previously they were written in
+  plaintext, which conforming viewers would "decrypt" into garbage — and which leaked
+  the plaintext in a supposedly encrypted file.
+- **Pagination works through all decorators.** Columns/tables wrapped in `Margin`,
+  `RoundedBorder`, `RoundedBox`, or per-edge borders (`BorderTop` …) now split across
+  pages; previously these wrappers silently disabled pagination and content overflowed
+  a single page. Decorator traversal is now driven by the element model
+  (`Element.PassthroughChild`), so new decorators participate automatically.
+- **Page-number footers in 100+ page documents.** `CurrentPageNumber()`/`TotalPages()`
+  spans are measured using a placeholder sized from the real page count (previously a
+  fixed 2-digit `"00"`), so footers no longer wrap taller than the space reserved for
+  them in long documents.
+- **Outline (bookmark) spec compliance.** Outline items no longer carry a spurious
+  `/Type /Outlines` entry, and `/Count` now reports all open descendants instead of
+  direct children only.
+- Missing negative-value validation added to the single-side `Padding*`/`Margin*`
+  overloads (`PaddingTop`, `MarginLeft`, `PaddingHorizontal`, …).
+
+### Changed
+- **BREAKING:** `TextDescriptor.Span(string, Action<TextStyle>)` is now
+  `Span(string, Func<TextStyle, TextStyle>)`. `TextStyle` is immutable, so the old
+  `Action` overload discarded every style it built — code using it compiled but had no
+  effect. Return the configured style instead: `t.Span("hi", s => s.Bold())`.
+- `Text(string)` accepts empty/whitespace strings (renders an empty block) instead of
+  throwing, so dynamic data no longer needs caller-side guards. `null` still throws.
+
+---
+
 ## [1.3.0] - 2026-05-19
 
 ### Added

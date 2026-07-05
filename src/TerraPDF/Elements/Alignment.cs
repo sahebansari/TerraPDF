@@ -16,13 +16,14 @@ internal sealed class Alignment : Element
 
     // -- Measure ---------------------------------------------------
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null)
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint)
     {
         // Report the child's natural content width so that Row auto-sized slots
         // receive the correct intrinsic size.  Parents that need the full available
         // width (Column, Row relative items) always supply their own width at draw
         // time via ctx.Width, so alignment offsets remain correct.
-        var childSize = Inner.Measure(w, h, defaultStyle);
+        var childSize = Inner.Measure(w, h, defaultStyle, totalPagesHint);
         return new ElementSize(childSize.Width, childSize.Height);
     }
 
@@ -30,7 +31,7 @@ internal sealed class Alignment : Element
 
     internal override void Draw(DrawingContext ctx)
     {
-        var childSize = Inner.Measure(ctx.Width, ctx.Height, ctx.DefaultTextStyle);
+        var childSize = Inner.Measure(ctx.Width, ctx.Height, ctx.DefaultTextStyle, ctx.TotalPages);
 
         double x = Horizontal switch
         {
@@ -50,4 +51,6 @@ internal sealed class Alignment : Element
         // its measured width, so text-level alignment inside the child has the right boundary.
         Inner.Draw(ctx.At(x, y, childSize.Width, childSize.Height));
     }
+
+    internal override Element? PassthroughChild => Inner;
 }

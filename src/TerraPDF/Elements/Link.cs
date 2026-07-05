@@ -17,15 +17,16 @@ internal sealed class Link : Element
 
     // -- Measure ---------------------------------------------------
 
-    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null) =>
-        Inner.Measure(w, h, defaultStyle);
+    internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
+        int totalPagesHint = DefaultTotalPagesHint) =>
+        Inner.Measure(w, h, defaultStyle, totalPagesHint);
 
     // -- Draw ------------------------------------------------------
 
     internal override void Draw(DrawingContext ctx)
     {
         // Measure the child to get the exact rendered size for the annotation rect.
-        var size = Inner.Measure(ctx.Width, ctx.Height, ctx.DefaultTextStyle);
+        var size = Inner.Measure(ctx.Width, ctx.Height, ctx.DefaultTextStyle, ctx.TotalPages);
 
         // Register the clickable annotation on the current page.
         ctx.Page.AddLinkAnnotation(ctx.X, ctx.Y, size.Width, size.Height, Url);

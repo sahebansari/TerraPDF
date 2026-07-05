@@ -16,7 +16,6 @@ public sealed class DocumentComposer : IDocumentContainer
     private readonly List<PageDescriptor> _pages = [];
 
     private readonly List<BookmarkInfo> _bookmarks = new();
-    private BookmarkInfo? _bookmarkRoot;  // First top-level bookmark (for tree building)
 
     // Document metadata (PDF Info dictionary)
     private string? _metadataTitle;
@@ -27,11 +26,6 @@ public sealed class DocumentComposer : IDocumentContainer
 
     // Encryption
     private EncryptionOptions? _encryptionOptions;
-
-    /// <summary>
-    /// Static recorder for heading elements during the first-pass render.
-    /// </summary>
-    internal static Action<HeadingElement, int, double>? CurrentHeadingRecorder { get; set; }
 
     // -- IDocumentContainer ----------------------------------------
 
@@ -148,10 +142,10 @@ public sealed class DocumentComposer : IDocumentContainer
     /// Builds the hierarchical bookmark tree structure after all bookmarks
     /// have been added. Establishes sibling links among all children within each parent.
     /// </summary>
-    private BookmarkInfo? BuildBookmarkTree()
+    private void BuildBookmarkTree()
     {
         if (_bookmarks.Count == 0)
-            return null;
+            return;
 
         // Link siblings for every parent (including top-level where Parent is null)
         foreach (var group in _bookmarks.GroupBy(b => b.Parent))
@@ -163,10 +157,6 @@ public sealed class DocumentComposer : IDocumentContainer
                 if (i < siblings.Count - 1) siblings[i].Next = siblings[i + 1];
             }
         }
-
-        // Top-level (no parent) entries form the root's children
-        _bookmarkRoot = _bookmarks.FirstOrDefault(b => b.Parent is null);
-        return _bookmarkRoot;
     }
 
     // -- Output ----------------------------------------------------
@@ -197,254 +187,109 @@ public sealed class DocumentComposer : IDocumentContainer
     }
 
 
-    // Measurement helpers
+    // ---------------------------------------------------------------
+    // Layout pass — the single source of pagination decisions.
+    // Produces per-page fragments; page counting is fragments.Count and
+    // rendering draws the placed items, so the two can never disagree.
     // ---------------------------------------------------------------
 
     /// <summary>
-    /// Returns the number of PDF pages that <paramref name="d"/> will produce when rendered.
-    /// Non-Column content always produces exactly one page.
+    /// A visual decorator found on the passthrough chain above the paginating
+    /// element.  <c>Left/Top/Right/Bottom</c> are the insets accumulated between
+    /// the decorator and the found element — how far the decorator's box extends
+    /// beyond the found element's area on each side.
     /// </summary>
-    private static int CountPdfPages(PageDescriptor d)
-    {
-        double contentW   = d.PageWidth - d.MarginLeft - d.MarginRight;
-        double firstPageH = AvailableContentHeight(d, contentW);
-
-        // When the header is shown only on the first page, continuation pages
-        // have the header height returned to them as extra content space.
-        double contPageH = firstPageH;
-        if (d.HeaderFirstPageOnly && d.HeaderSlot.Child is not null)
-        {
-            double hdrH = d.HeaderSlot.Measure(contentW, d.PageHeight, d.DefaultStyle).Height;
-            contPageH = firstPageH + hdrH;
-        }
-
-        var (col, _, _, insetW, insetH) = FindColumnWithInsets(d.ContentSlot.Child);
-        return col is null ? 1 : CountColumnPages(
-            col, contentW + insetW,
-            firstPageH + insetH, contPageH + insetH,
-            d.DefaultStyle);
-    }
-
-    /// <summary>Simulates item-by-item rendering to count how many pages a Column needs.</summary>
-    private static int CountColumnPages(
-        Column col, double w,
-        double firstPageH, double continuationPageH,
-        TextStyle? style)
-    {
-        int    pages        = 1;
-        double curY         = 0;
-        double currentPageH = firstPageH;
-
-        for (int i = 0; i < col.Items.Count; i++)
-        {
-            var item = col.Items[i];
-
-            // Explicit page break: start a new page (unless we are already at the top).
-            if (item.Child is PageBreak)
-            {
-                if (curY > 0) { pages++; curY = 0; currentPageH = continuationPageH; }
-                continue;   // spacing is not added before/after a page break
-            }
-
-            var (table, _, _, tInsetW, tInsetH) = FindTableWithInsets(item.Child);
-
-            if (table is not null && table.HeaderRowCount > 0)
-            {
-                double tableW     = w + tInsetW;
-                double tablePageH = currentPageH + tInsetH;
-                var colWidths     = table.GetColumnWidths(tableW);
-                var rowHeights    = table.GetRowHeights(colWidths, style);
-                int dataCount     = Math.Max(0, rowHeights.Length - table.HeaderRowCount);
-
-                double tHdrH = Enumerable
-                    .Range(0, Math.Min(table.HeaderRowCount, rowHeights.Length))
-                    .Sum(r => rowHeights[r]);
-
-                if (tHdrH > currentPageH - curY && curY > 0)
-                {
-                    pages++;
-                    curY = 0;
-                    currentPageH = continuationPageH;
-                    tablePageH   = currentPageH + tInsetH;
-                }
-
-                double batchH       = tHdrH;
-                bool   batchHasData = false;
-
-                for (int dr = 0; dr < dataCount; dr++)
-                {
-                    int    ar = table.HeaderRowCount + dr;
-                    double rh = ar < rowHeights.Length ? rowHeights[ar] : 0;
-
-                    if (batchH + rh > tablePageH - curY && batchHasData)
-                    {
-                        pages++;
-                        curY         = 0;
-                        currentPageH = continuationPageH;
-                        tablePageH   = currentPageH + tInsetH;
-                        batchH       = tHdrH + rh;
-                        batchHasData = true;
-                    }
-                    else
-                    {
-                        batchH      += rh;
-                        batchHasData = true;
-                    }
-                }
-
-                curY += batchH;
-            }
-            else
-            {
-                double itemH = item.Measure(w, currentPageH, style).Height;
-                if (curY > 0 && curY + itemH > currentPageH)
-                {
-                    pages++;
-                    curY = 0;
-                    currentPageH = continuationPageH;
-                }
-                curY += itemH;
-            }
-
-            if (i < col.Items.Count - 1)
-                curY += col.Spacing;
-        }
-
-        return pages;
-    }
+    private readonly record struct ChromeDecorator(
+        Element Element, double Left, double Top, double Right, double Bottom);
 
     /// <summary>
     /// Walks the decorator chain from <paramref name="element"/> down to the first
-    /// <see cref="Column"/>, collecting the cumulative insets introduced by any
-    /// <see cref="Padding"/> wrappers encountered along the way.
-    /// Transparent wrappers (<see cref="Container"/>, <see cref="Background"/>,
-    /// <see cref="Border"/>, <see cref="Alignment"/>) are traversed without adding insets.
-    /// Returns <c>null</c> for the column if none is reachable.
+    /// element of type <typeparamref name="T"/>, collecting the cumulative insets
+    /// introduced by <see cref="Padding"/>/<see cref="Margin"/> wrappers and the
+    /// visual decorators (<see cref="Element.HasDecoration"/>) encountered on the
+    /// way.  Traversal is driven by <see cref="Element.PassthroughChild"/>, so
+    /// every layout-transparent decorator participates automatically.
+    /// Inset conventions: <c>InsetX/InsetY</c> are left/top offsets;
+    /// <c>InsetW/InsetH</c> are (negative) width/height deltas.
+    /// Returns <c>null</c> for the element if none is reachable.
     /// </summary>
-    private static (Column? Column, double InsetX, double InsetY, double InsetW, double InsetH)
-        FindColumnWithInsets(Element? element)
+    private static (T? Found, double InsetX, double InsetY, double InsetW, double InsetH, List<ChromeDecorator> Chrome)
+        FindWithChrome<T>(Element? element) where T : Element
     {
-        double iX = 0, iY = 0, iW = 0, iH = 0;
+        double iL = 0, iT = 0, iR = 0, iB = 0;
+        var visuals = new List<(Element El, double L, double T, double R, double B)>();
 
         while (element is not null)
         {
-            switch (element)
+            if (element is T found)
             {
-                case Column col:
-                    return (col, iX, iY, iW, iH);
-                case Container c:
-                    element = c.Child;
-                    break;
-                case Padding p:
-                    iX += p.Left;  iY += p.Top;
-                    iW -= p.Left + p.Right;
-                    iH -= p.Top  + p.Bottom;
-                    element = p.Inner.Child;
-                    break;
-                case Background bg:
-                    element = bg.Inner.Child;
-                    break;
-                case Border b:
-                    element = b.Inner.Child;
-                    break;
-                case Alignment a:
-                    element = a.Inner.Child;
-                    break;
-                default:
-                    return (null, 0, 0, 0, 0);
+                // Convert each visual's "insets so far" into "insets between it and T".
+                var chrome = visuals
+                    .Select(v => new ChromeDecorator(v.El, iL - v.L, iT - v.T, iR - v.R, iB - v.B))
+                    .ToList();
+                return (found, iL, iT, -(iL + iR), -(iT + iB), chrome);
             }
+
+            if (element.HasDecoration)
+                visuals.Add((element, iL, iT, iR, iB));
+
+            var (l, t, r, b) = element.PassthroughInsets;
+            iL += l;  iT += t;  iR += r;  iB += b;
+            element = element.PassthroughChild;
         }
-        return (null, 0, 0, 0, 0);
+        return (null, 0, 0, 0, 0, []);
     }
 
     /// <summary>
     /// Computes the usable content height on a page after reserving space for
     /// margins, header, and footer.
     /// </summary>
-    private static double AvailableContentHeight(PageDescriptor d, double contentW)
+    private static double AvailableContentHeight(PageDescriptor d, double contentW, int totalPagesHint)
     {
         double headerH = d.HeaderSlot.Child is not null
-            ? d.HeaderSlot.Measure(contentW, d.PageHeight, d.DefaultStyle).Height : 0;
+            ? d.HeaderSlot.Measure(contentW, d.PageHeight, d.DefaultStyle, totalPagesHint).Height : 0;
         double footerH = d.FooterSlot.Child is not null
-            ? d.FooterSlot.Measure(contentW, d.PageHeight, d.DefaultStyle).Height : 0;
+            ? d.FooterSlot.Measure(contentW, d.PageHeight, d.DefaultStyle, totalPagesHint).Height : 0;
 
         return d.PageHeight - d.MarginTop - d.MarginBottom - headerH - footerH;
     }
 
-    /// <summary>
-    /// Walks the decorator chain from <paramref name="element"/> to find the first
-    /// <see cref="Table"/>, collecting <see cref="Padding"/> insets along the way.
-    /// </summary>
-    private static (Table? Table, double InsetX, double InsetY, double InsetW, double InsetH)
-        FindTableWithInsets(Element? element)
-    {
-        double iX = 0, iY = 0, iW = 0, iH = 0;
-
-        while (element is not null)
-        {
-            switch (element)
-            {
-                case Table t:       return (t, iX, iY, iW, iH);
-                case Container c:   element = c.Child; break;
-                case Padding p:
-                    iX += p.Left;  iY += p.Top;
-                    iW -= p.Left + p.Right;
-                    iH -= p.Top  + p.Bottom;
-                    element = p.Inner.Child; break;
-                case Background bg: element = bg.Inner.Child; break;
-                case Border b:      element = b.Inner.Child; break;
-                case Alignment a:   element = a.Inner.Child; break;
-                default:            return (null, 0, 0, 0, 0);
-            }
-        }
-        return (null, 0, 0, 0, 0);
-    }
-
-    // ---------------------------------------------------------------
-    // Render pass
-    // ---------------------------------------------------------------
 
     /// <summary>
-    /// Renders one <see cref="PageDescriptor"/>, emitting as many PDF pages as required.
+    /// Lays out one <see cref="PageDescriptor"/> into page fragments, splitting a
+    /// top-level Column between items and header-row tables between rows exactly
+    /// as the renderer will draw them.
     /// </summary>
-    private static void RenderDescriptor(
-        PdfDocument doc, PageDescriptor descriptor,
-        ref int pageNumber, int totalPages)
+    private static List<PageFragment> LayoutDescriptor(PageDescriptor d, int totalPagesHint)
     {
-        double contentX = descriptor.MarginLeft;
-        double contentW = descriptor.PageWidth - descriptor.MarginLeft - descriptor.MarginRight;
-        double contentH = AvailableContentHeight(descriptor, contentW);
+        double contentX = d.MarginLeft;
+        double contentW = d.PageWidth - d.MarginLeft - d.MarginRight;
+        double contentH = AvailableContentHeight(d, contentW, totalPagesHint);
 
-        double headerH  = descriptor.HeaderSlot.Child is not null
-            ? descriptor.HeaderSlot.Measure(contentW, descriptor.PageHeight, descriptor.DefaultStyle).Height : 0;
-        double footerH  = descriptor.FooterSlot.Child is not null
-            ? descriptor.FooterSlot.Measure(contentW, descriptor.PageHeight, descriptor.DefaultStyle).Height : 0;
-        double contentY = descriptor.MarginTop + headerH;
+        double headerH  = d.HeaderSlot.Child is not null
+            ? d.HeaderSlot.Measure(contentW, d.PageHeight, d.DefaultStyle, totalPagesHint).Height : 0;
+        double contentY = d.MarginTop + headerH;
 
         // When the header appears on the first page only, continuation pages start
         // their content at the top margin (no header offset) and gain the header
         // height back as usable content space.
-        double contContentY = descriptor.HeaderFirstPageOnly
-            ? descriptor.MarginTop
-            : contentY;
-        double contContentH = descriptor.HeaderFirstPageOnly
-            ? contentH + headerH
-            : contentH;
+        double contContentY = d.HeaderFirstPageOnly ? d.MarginTop : contentY;
+        double contContentH = d.HeaderFirstPageOnly ? contentH + headerH : contentH;
 
-        var (col, insetX, insetY, insetW, insetH) = FindColumnWithInsets(descriptor.ContentSlot.Child);
+        var (col, insetX, insetY, insetW, insetH, chrome) = FindWithChrome<Column>(d.ContentSlot.Child);
+        var fragments = new List<PageFragment>();
 
-        // ── Non-Column content: single page (original behaviour) ──────────────
+        // ── Non-Column content: single page (decorators draw via the slot) ────
         if (col is null)
         {
-            pageNumber++;
-            var ctx = StartPage(doc, descriptor, contentX, contentW,
-                                headerH, footerH, pageNumber, totalPages, isFirstPage: true);
-            if (descriptor.ContentSlot.Child is not null)
-                descriptor.ContentSlot.Draw(ctx.At(contentX, contentY, contentW, contentH));
-            return;
+            var single = new PageFragment { IsFirstOfDescriptor = true };
+            if (d.ContentSlot.Child is not null)
+                single.Items.Add(new PlacedItem(d.ContentSlot, contentX, contentY, contentW, contentH));
+            fragments.Add(single);
+            return fragments;
         }
 
-        // Apply wrapper insets (e.g. PaddingVertical) to the item draw area.
+        // Apply wrapper insets (e.g. PaddingVertical) to the item area.
         double itemsX      = contentX + insetX;
         double firstItemsY = contentY     + insetY;
         double contItemsY  = contContentY + insetY;
@@ -455,13 +300,36 @@ public sealed class DocumentComposer : IDocumentContainer
         // Mutable per-page values — updated each time a new page is started.
         double currentItemsY = firstItemsY;
         double currentItemsH = firstItemsH;
-
-        // ── Column content: split items across pages as needed ────────────────
-        pageNumber++;
-        var baseCtx = StartPage(doc, descriptor, contentX, contentW,
-                                headerH, footerH, pageNumber, totalPages, isFirstPage: true);
         double curY = 0;
 
+        // Chrome covers the page's full item area (matching the non-split path,
+        // where decorators receive the whole content box), expanded by the insets
+        // sitting between each decorator and the column.
+        PageFragment NewFragment(bool first)
+        {
+            var f = new PageFragment { IsFirstOfDescriptor = first };
+            foreach (var c in chrome)
+                f.Items.Add(new PlacedItem(c.Element,
+                    itemsX        - c.Left,
+                    currentItemsY - c.Top,
+                    itemsW        + c.Left + c.Right,
+                    currentItemsH + c.Top  + c.Bottom,
+                    DecorationOnly: true));
+            fragments.Add(f);
+            return f;
+        }
+
+        var current = NewFragment(first: true);
+
+        void StartNewPage()
+        {
+            curY          = 0;
+            currentItemsY = contItemsY;
+            currentItemsH = contItemsH;
+            current       = NewFragment(first: false);
+        }
+
+        // ── Column content: split items across pages as needed ────────────────
         for (int i = 0; i < col.Items.Count; i++)
         {
             var item = col.Items[i];
@@ -470,142 +338,198 @@ public sealed class DocumentComposer : IDocumentContainer
             if (item.Child is PageBreak)
             {
                 if (curY > 0)
-                {
-                    pageNumber++;
-                    baseCtx = StartPage(doc, descriptor, contentX, contentW,
-                                        headerH, footerH, pageNumber, totalPages, isFirstPage: false);
-                    curY          = 0;
-                    currentItemsY = contItemsY;
-                    currentItemsH = contItemsH;
-                }
+                    StartNewPage();
                 continue;   // spacing is not added before/after a page break
             }
 
-            var (table, tInsetX, tInsetY, tInsetW, tInsetH) = FindTableWithInsets(item.Child);
+            // Item-level decorator chrome around a *split* table is not repeated
+            // per page (only column-level chrome is); non-split items draw their
+            // decorators normally via item.Draw.
+            var (table, tInsetX, tInsetY, tInsetW, tInsetH, _) = FindWithChrome<Table>(item.Child);
 
             if (table is not null && table.HeaderRowCount > 0)
             {
-                RenderTableSplit(
-                    table, tInsetX, tInsetY, tInsetW, tInsetH,
-                    ref curY, ref pageNumber, ref baseCtx,
-                    ref currentItemsY, ref currentItemsH,
-                    doc, descriptor, contentX, contentW, headerH, footerH,
-                    itemsX, itemsW, contItemsY, contItemsH, totalPages);
+                // Split the table between rows; header rows repeat on every slice.
+                double tableX = itemsX + tInsetX;
+                double tableW = itemsW + tInsetW;
+
+                var colWidths  = table.GetColumnWidths(tableW);
+                var rowHeights = table.GetRowHeights(colWidths, d.DefaultStyle, totalPagesHint);
+                int totalRows  = rowHeights.Length;
+                int dataCount  = Math.Max(0, totalRows - table.HeaderRowCount);
+
+                var    headerIndices = Enumerable.Range(0, Math.Min(table.HeaderRowCount, totalRows)).ToList();
+                double tHdrH         = headerIndices.Sum(r => rowHeights[r]);
+
+                bool isFirstSlice = true;
+                int  dr           = 0;
+
+                do
+                {
+                    double topOffset = isFirstSlice ? tInsetY : 0;
+                    double avail     = currentItemsH - curY - topOffset;
+
+                    if (tHdrH > avail && curY > 0)
+                    {
+                        StartNewPage();
+                        topOffset = isFirstSlice ? tInsetY : 0;
+                        avail     = currentItemsH - curY - topOffset;
+                    }
+
+                    double batchH       = tHdrH;
+                    var    batchIndices = new List<int>(headerIndices);
+                    bool   batchHasData = false;
+
+                    while (dr < dataCount)
+                    {
+                        int    ar = table.HeaderRowCount + dr;
+                        double rh = ar < rowHeights.Length ? rowHeights[ar] : 0;
+
+                        if (batchH + rh > avail && batchHasData)
+                            break;
+
+                        batchH += rh;
+                        batchIndices.Add(ar);
+                        batchHasData = true;
+                        dr++;
+                    }
+
+                    // A single row taller than the page: force it out anyway so
+                    // layout always makes progress.
+                    if (!batchHasData && dr < dataCount)
+                    {
+                        int    ar = table.HeaderRowCount + dr;
+                        double rh = ar < rowHeights.Length ? rowHeights[ar] : 0;
+                        batchH += rh;
+                        batchIndices.Add(ar);
+                        dr++;
+                    }
+
+                    current.Items.Add(new PlacedItem(
+                        new TableSlice(table, colWidths, rowHeights, batchIndices),
+                        tableX, currentItemsY + curY + topOffset, tableW, batchH));
+                    curY += batchH + topOffset;
+
+                    isFirstSlice = false;
+
+                    if (dr < dataCount)
+                        StartNewPage();
+
+                } while (dr < dataCount);
             }
             else
             {
-                double itemH = item.Measure(itemsW, currentItemsH, descriptor.DefaultStyle).Height;
+                double itemH = item.Measure(itemsW, currentItemsH, d.DefaultStyle, totalPagesHint).Height;
 
                 if (curY > 0 && curY + itemH > currentItemsH)
+                    StartNewPage();
+
+                bool placed = false;
+
+                // Item taller than a whole page: split TextBlocks between their
+                // wrapped lines (mirrors the table row-splitting above).  Items
+                // whose chain doesn't reach a TextBlock (Rows, images, links,
+                // headings) keep the legacy overflow behaviour.
+                if (itemH > currentItemsH - curY)
                 {
-                    pageNumber++;
-                    baseCtx = StartPage(doc, descriptor, contentX, contentW,
-                                        headerH, footerH, pageNumber, totalPages, isFirstPage: false);
-                    curY          = 0;
-                    currentItemsY = contItemsY;
-                    currentItemsH = contItemsH;
+                    var (textBlock, bInsetX, bInsetY, bInsetW, bInsetH, _) =
+                        FindWithChrome<TextBlock>(item.Child);
+
+                    if (textBlock is not null)
+                    {
+                        double textX = itemsX + bInsetX;
+                        double textW = itemsW + bInsetW;
+                        var (lines, resolved, lineH) =
+                            textBlock.LayoutLines(textW, d.DefaultStyle, totalPagesHint);
+
+                        int  li         = 0;
+                        bool firstSlice = true;
+
+                        while (li < lines.Count)
+                        {
+                            double topOffset = firstSlice ? bInsetY : 0;
+                            double avail     = currentItemsH - curY - topOffset;
+                            int    fit       = (int)Math.Floor(avail / lineH);
+
+                            if (fit < 1)
+                            {
+                                if (curY > 0) { StartNewPage(); continue; }
+                                fit = 1;   // page shorter than one line: force progress
+                            }
+                            fit = Math.Min(fit, lines.Count - li);
+
+                            var slice = new TextBlockSlice(lines.GetRange(li, fit), resolved, lineH);
+                            current.Items.Add(new PlacedItem(
+                                slice, textX, currentItemsY + curY + topOffset, textW, fit * lineH));
+
+                            curY += fit * lineH + topOffset;
+                            li   += fit;
+                            firstSlice = false;
+
+                            if (li < lines.Count)
+                                StartNewPage();
+                        }
+
+                        // Bottom inset of the wrapper (e.g. PaddingBottom) lands
+                        // after the last slice.  PassthroughInsets convention:
+                        // bInsetH = -(top + bottom).
+                        curY  += -bInsetH - bInsetY;
+                        placed = true;
+                    }
                 }
 
-                item.Draw(baseCtx.At(itemsX, currentItemsY + curY, itemsW, itemH));
-                curY += itemH;
+                if (!placed)
+                {
+                    current.Items.Add(new PlacedItem(item, itemsX, currentItemsY + curY, itemsW, itemH));
+                    curY += itemH;
+                }
             }
 
             if (i < col.Items.Count - 1)
                 curY += col.Spacing;
         }
+
+        return fragments;
     }
 
+    // ---------------------------------------------------------------
+    // Render pass — draws previously laid-out fragments
+    // ---------------------------------------------------------------
+
     /// <summary>
-    /// Renders a <see cref="Table"/> that has header rows across as many PDF pages as needed.
-    /// Header rows are repeated at the top of every continuation page.
+    /// Renders one descriptor's laid-out fragments, emitting one PDF page per
+    /// fragment with the descriptor's page background, header, and footer.
     /// </summary>
-    private static void RenderTableSplit(
-        Table  table,
-        double tInsetX, double tInsetY, double tInsetW, double tInsetH,
-        ref double curY, ref int pageNumber, ref DrawingContext baseCtx,
-        ref double currentItemsY, ref double currentItemsH,
-        PdfDocument doc, PageDescriptor descriptor,
-        double contentX, double contentW, double pageHeaderH, double footerH,
-        double itemsX,   double itemsW,
-        double contItemsY, double contItemsH,
-        int totalPages)
+    private static void RenderFragments(
+        PdfDocument doc, PageDescriptor d, List<PageFragment> fragments,
+        ref int pageNumber, int totalPages,
+        Action<HeadingElement, int, double>? headingRecorder,
+        Action<string, string?, int, double>? bookmarkRecorder = null)
     {
-        double tableX = itemsX + tInsetX;
-        double tableW = itemsW + tInsetW;
+        double contentX = d.MarginLeft;
+        double contentW = d.PageWidth - d.MarginLeft - d.MarginRight;
 
-        var colWidths  = table.GetColumnWidths(tableW);
-        var rowHeights = table.GetRowHeights(colWidths, descriptor.DefaultStyle);
-        int totalRows  = rowHeights.Length;
-        int dataCount  = Math.Max(0, totalRows - table.HeaderRowCount);
+        double headerH = d.HeaderSlot.Child is not null
+            ? d.HeaderSlot.Measure(contentW, d.PageHeight, d.DefaultStyle, totalPages).Height : 0;
+        double footerH = d.FooterSlot.Child is not null
+            ? d.FooterSlot.Measure(contentW, d.PageHeight, d.DefaultStyle, totalPages).Height : 0;
 
-        var    headerIndices = Enumerable.Range(0, Math.Min(table.HeaderRowCount, totalRows)).ToList();
-        double tHdrH         = headerIndices.Sum(r => rowHeights[r]);
-
-        bool isFirstSlice = true;
-        int  dr           = 0;
-
-        do
+        foreach (var fragment in fragments)
         {
-            double topOffset = isFirstSlice ? tInsetY : 0;
-            double avail     = currentItemsH - curY - topOffset;
+            pageNumber++;
+            var ctx = StartPage(doc, d, contentX, contentW,
+                                headerH, footerH, pageNumber, totalPages,
+                                fragment.IsFirstOfDescriptor, headingRecorder, bookmarkRecorder);
 
-            if (tHdrH > avail && curY > 0)
+            foreach (var placed in fragment.Items)
             {
-                pageNumber++;
-                baseCtx = StartPage(doc, descriptor, contentX, contentW,
-                                    pageHeaderH, footerH, pageNumber, totalPages, isFirstPage: false);
-                curY           = 0;
-                currentItemsY  = contItemsY;
-                currentItemsH  = contItemsH;
-                topOffset      = isFirstSlice ? tInsetY : 0;
-                avail          = currentItemsH - curY - topOffset;
+                var itemCtx = ctx.At(placed.X, placed.Y, placed.W, placed.H);
+                if (placed.DecorationOnly)
+                    placed.Element.DrawDecoration(itemCtx);
+                else
+                    placed.Element.Draw(itemCtx);
             }
-
-            double batchH       = tHdrH;
-            var    batchIndices = new List<int>(headerIndices);
-            bool   batchHasData = false;
-
-            while (dr < dataCount)
-            {
-                int    ar = table.HeaderRowCount + dr;
-                double rh = ar < rowHeights.Length ? rowHeights[ar] : 0;
-
-                if (batchH + rh > avail && batchHasData)
-                    break;
-
-                batchH += rh;
-                batchIndices.Add(ar);
-                batchHasData = true;
-                dr++;
-            }
-
-            if (!batchHasData && dr < dataCount)
-            {
-                int    ar = table.HeaderRowCount + dr;
-                double rh = ar < rowHeights.Length ? rowHeights[ar] : 0;
-                batchH += rh;
-                batchIndices.Add(ar);
-                dr++;
-            }
-
-            double drawY = currentItemsY + curY + topOffset;
-            table.DrawRows(baseCtx.At(tableX, drawY, tableW, batchH),
-                           colWidths, rowHeights, batchIndices);
-            curY += batchH + topOffset;
-
-            isFirstSlice = false;
-
-            if (dr < dataCount)
-            {
-                pageNumber++;
-                baseCtx = StartPage(doc, descriptor, contentX, contentW,
-                                    pageHeaderH, footerH, pageNumber, totalPages, isFirstPage: false);
-                curY          = 0;
-                currentItemsY = contItemsY;
-                currentItemsH = contItemsH;
-            }
-
-        } while (dr < dataCount);
+        }
     }
 
     /// <summary>
@@ -617,7 +541,9 @@ public sealed class DocumentComposer : IDocumentContainer
         double contentX, double contentW,
         double headerH, double footerH,
         int pageNumber, int totalPages,
-        bool isFirstPage)
+        bool isFirstPage,
+        Action<HeadingElement, int, double>? headingRecorder,
+        Action<string, string?, int, double>? bookmarkRecorder = null)
     {
         var pdfPage = doc.AddPage(d.PageWidth, d.PageHeight);
 
@@ -634,7 +560,8 @@ public sealed class DocumentComposer : IDocumentContainer
             Y                = 0,
             Width            = d.PageWidth,
             Height           = d.PageHeight,
-            HeadingRecorder  = CurrentHeadingRecorder,
+            HeadingRecorder  = headingRecorder,
+            BookmarkRecorder = bookmarkRecorder,
         };
 
         // Draw header only on the first page when HeaderFirstPageOnly is set.
@@ -696,9 +623,6 @@ public sealed class DocumentComposer : IDocumentContainer
 
         switch (element)
         {
-            case Container c:
-                ScanElement(c.Child, list);
-                break;
             case Column col:
                 foreach (var item in col.Items)
                     ScanElement(item.Child, list);
@@ -710,6 +634,25 @@ public sealed class DocumentComposer : IDocumentContainer
             case Table table:
                 foreach (var cell in table.Cells)
                     ScanElement(cell.Slot.Child, list);
+                break;
+            // Opaque wrappers that still contain scannable content.  These must
+            // be traversed here or a wrapped heading is invisible to the static
+            // scan while the render-time recorder still fires — desynchronising
+            // the TOC entry list from its display titles.
+            case Link link:
+                ScanElement(link.Inner, list);
+                break;
+            case InternalLinkElement il:
+                ScanElement(il.Inner, list);
+                break;
+            case BookmarkAnchorElement anchor:
+                ScanElement(anchor.Inner, list);
+                break;
+            default:
+                // Layout-transparent decorators (Container, Padding, Margin,
+                // Background, borders, Alignment) — same chain the paginator walks.
+                if (element?.PassthroughChild is { } passthrough)
+                    ScanElement(passthrough, list);
                 break;
         }
     }
@@ -772,6 +715,34 @@ public sealed class DocumentComposer : IDocumentContainer
     // Output
     // ==============================================================
 
+    private static int Digits(int n) => n <= 0 ? 1 : (int)Math.Floor(Math.Log10(n)) + 1;
+
+    /// <summary>
+    /// Lays out every descriptor into fragments, re-measuring with the real page
+    /// count as the page-number placeholder until its digit count stabilises.
+    /// A wider placeholder (e.g. "120" vs "99") can change footer wrapping and
+    /// thus the available content height, so counting and measuring must agree.
+    /// Converges in one extra pass for realistic documents; bounded at 3.
+    /// The returned fragments are exactly what will be rendered, so the page
+    /// count and the drawn pages can never disagree.
+    /// </summary>
+    private (int TotalPages, List<List<PageFragment>> Fragments) LayoutAllStable(ref int totalPagesHint)
+    {
+        int hint = totalPagesHint;
+        var fragments = _pages.Select(p => LayoutDescriptor(p, hint)).ToList();
+        int total = fragments.Sum(f => f.Count);
+
+        for (int i = 0; i < 3 && Digits(total) != Digits(hint); i++)
+        {
+            hint      = total;
+            fragments = _pages.Select(p => LayoutDescriptor(p, hint)).ToList();
+            total     = fragments.Sum(f => f.Count);
+        }
+
+        totalPagesHint = hint;
+        return (total, fragments);
+    }
+
     private void WriteTo(Stream output)
     {
         // 1. Locate any TOC page(s)
@@ -791,66 +762,94 @@ public sealed class DocumentComposer : IDocumentContainer
         // Compute hierarchical numbering for TOC display titles (e.g., "1.2.3 Title")
         var displayTitles = ComputeDisplayTitles(allHeadings);
 
-        // 3. If TOC exists, create placeholder column and measure TOC page count
-        int tocPageCount = 0;
+        // 3. If TOC exists, create placeholder column
         if (tocPageIndices.Count > 0)
         {
             var placeholder = BuildPlaceholderTocColumn(allHeadings, displayTitles);
             _pages[tocPageIndices[0]].ContentSlot.Child = placeholder;
-
-            // Measure how many pages the TOC (with placeholder) will occupy.
-            // This count is used to offset displayed page numbers.
-            tocPageCount = CountPdfPages(_pages[tocPageIndices[0]]);
         }
 
-        // 4. Compute total pages (with placeholder TOC)
-        int totalPages = _pages.Sum(CountPdfPages);
+        // 4. Lay out every descriptor into fragments (with placeholder TOC),
+        //    iterating until the page-number placeholder used during measurement
+        //    has the same digit count as the real total.
+        int pagesHint = Elements.Element.DefaultTotalPagesHint;
+        var (totalPages, allFragments) = LayoutAllStable(ref pagesHint);
 
-        // 5. If TOC exists, perform dummy render to collect heading positions
-        List<TocEntry> collectedEntries = new();
+        // The TOC's own page count offsets the page numbers it displays.
+        int tocPageCount = tocPageIndices.Count > 0
+            ? allFragments[tocPageIndices[0]].Count
+            : 0;
+
+        // 5. If TOC exists, render the cached fragments into a throwaway document
+        //    with a local recorder to collect heading positions (no re-layout,
+        //    no shared state — safe under concurrent document generation).
         if (tocPageIndices.Count > 0)
         {
-            var dummyDoc = new PdfDocument();
-            DocumentComposer.CurrentHeadingRecorder = (h, pg, y) =>
-            {
+            var collectedEntries = new List<TocEntry>();
+            Action<HeadingElement, int, double> recorder = (h, pg, y) =>
                 collectedEntries.Add(new TocEntry
                 {
-                    Level = h.Level,
-                    Title = h.Title,
+                    Level      = h.Level,
+                    Title      = h.Title,
                     PageNumber = pg,
-                    Top = y
+                    Top        = y,
                 });
-            };
-            int dummyPageNum = 0;
-            foreach (var desc in _pages)
-            {
-                RenderDescriptor(dummyDoc, desc, ref dummyPageNum, totalPages);
-            }
-            DocumentComposer.CurrentHeadingRecorder = null;
 
-            // Replace placeholder with real TOC, applying the page-number offset
+            var dummyDoc = new PdfDocument();
+            int dummyPageNum = 0;
+            for (int i = 0; i < _pages.Count; i++)
+                RenderFragments(dummyDoc, _pages[i], allFragments[i], ref dummyPageNum, totalPages, recorder);
+
+            // Replace placeholder with real TOC, applying the page-number offset,
+            // then re-lay-out with the final content.
             var realToc = BuildRealTocColumn(collectedEntries, displayTitles, tocPageCount);
             _pages[tocPageIndices[0]].ContentSlot.Child = realToc;
 
-            // Recompute total pages after real TOC
-            totalPages = _pages.Sum(CountPdfPages);
+            (totalPages, allFragments) = LayoutAllStable(ref pagesHint);
         }
 
         // 6. Create real document
         var doc = new PdfDocument();
         doc.SetMetadata(_metadataTitle, _metadataAuthor, _metadataSubject, _metadataKeywords, _metadataCreator);
 
-        BookmarkInfo? bookmarkRoot = BuildBookmarkTree();
-        doc.SetBookmarks(_bookmarks, totalPages);
-
         if (_encryptionOptions is not null)
             doc.SetEncryption(_encryptionOptions);
 
-        int pageNumber = 0;
-        foreach (var descriptor in _pages)
+        // Bookmark anchors resolve their page/Y during this final render, so the
+        // outline is assembled afterwards (doc.Save consumes it — safe ordering).
+        // Dedupe by (title, parent): an anchor placed in a repeated table-header
+        // row would otherwise record once per page.
+        var anchors = new List<(string Title, string? Parent, int Page, double Top)>();
+        var seenAnchors = new HashSet<(string, string?)>();
+        Action<string, string?, int, double> anchorRecorder = (title, parent, page, top) =>
         {
-            RenderDescriptor(doc, descriptor, ref pageNumber, totalPages);
+            if (seenAnchors.Add((title, parent)))
+                anchors.Add((title, parent, page, top));
+        };
+
+        int pageNumber = 0;
+        for (int i = 0; i < _pages.Count; i++)
+            RenderFragments(doc, _pages[i], allFragments[i], ref pageNumber, totalPages,
+                headingRecorder: null, bookmarkRecorder: anchorRecorder);
+
+        // Convert recorded anchors to outline nodes (after manual bookmarks, in
+        // draw order; parents may be manual bookmarks or earlier anchors).
+        foreach (var (title, parentTitle, page, top) in anchors)
+        {
+            var bm = new BookmarkInfo { Title = title, PageNumber = page, Top = top };
+            if (parentTitle is not null)
+            {
+                var parent = _bookmarks.LastOrDefault(b => b.Title == parentTitle)
+                    ?? throw new InvalidOperationException(
+                        $"Parent bookmark '{parentTitle}' for anchor '{title}' not found.");
+                bm.Parent = parent;
+                parent.Children.Add(bm);
+            }
+            _bookmarks.Add(bm);
         }
+
+        BuildBookmarkTree();
+        doc.SetBookmarks(_bookmarks, totalPages);
 
         doc.Save(output);
     }
