@@ -11,8 +11,8 @@ A free, pure C# library designed for fast and reliable PDF generation.
 [https://terrapdf.com/](https://terrapdf.com/)
 
 
-> **New in 1.4.0:** 
-[AES-256 encryption by default](https://github.com/sahebansari/TerraPDF/blob/master/docs/encryption.md), plus bytes/stream image sources, anchor-based bookmarks, and the immutable `TextStyle` callback for multi-span text.
+> **New in 1.5.0:** 
+Code128 barcodes and QR codes (ISO/IEC 18004, versions 1-40, all four error correction levels) via `container.Barcode(...)` and `container.QrCode(...)` — rendered as vector-filled rectangles, no raster image pipeline, placeable anywhere a `Column`, `Row`, or `Table` cell can go.
 
 **TerraPDF** is a lightweight, zero-dependency, pure C# library for generating professional PDF 1.7 documents programmatically. 
 It provides a fluent, composable API that covers the full document-authoring lifecycle — from page layout and 
@@ -47,6 +47,8 @@ runtime packages, and no licensing restrictions.
 - **Anchor-based bookmarks** — bookmark content directly to rendered elements and keep destinations accurate
  - Full **WinAnsiEncoding** character coverage
  - **Vector graphics canvas** — lines, rectangles, rounded rectangles, circles, ellipses, arbitrary Bézier paths, polygons, and grid helpers via `container.Canvas()`
+ - **Code128 barcodes** — `container.Barcode(...)`, with optional human-readable caption, custom colours, and quiet zone
+ - **QR codes** — `container.QrCode(...)`, full ISO/IEC 18004 generator (versions 1-40, error correction levels L/M/Q/H), rendered as vector rectangles
  - Fluent, composable API
 
 ---

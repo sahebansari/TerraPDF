@@ -28,6 +28,7 @@ ReportWithTocSample.Generate(Path.Combine(sampleDir, "09_report_with_toc.pdf"));
 VectorGraphicsShowcase.Generate(Path.Combine(sampleDir, "10_vector_graphics_showcase.pdf"));
 UnicodeShowcase.Generate(Path.Combine(sampleDir, "11_unicode_showcase.pdf"));
 EncryptionShowcase.Generate(Path.Combine(sampleDir, "12_encryption_showcase.pdf"));
+BarcodesAndQrShowcase.Generate(Path.Combine(sampleDir, "13_barcodes_and_qr_showcase.pdf"));
 
 Console.WriteLine();
 Console.WriteLine("Done.");

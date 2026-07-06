@@ -1,3 +1,4 @@
+using TerraPDF.Barcodes;
 using TerraPDF.Elements;
 using TerraPDF.Infra;
 using TerraPDF.Helpers;
@@ -577,6 +578,72 @@ public static class ContainerExtensions
         using var ms = new MemoryStream();
         stream.CopyTo(ms);
         return ms.ToArray();
+    }
+
+    // -- Barcode -----------------------------------------------------
+
+    /// <summary>
+    /// Places a Code128 (Subset B) barcode encoding <paramref name="data"/>.
+    /// Bars are drawn as vector rectangles, so the barcode stays crisp at any zoom.
+    /// </summary>
+    /// <param name="container">The container slot to attach the barcode to.</param>
+    /// <param name="data">Text to encode. Must be printable ASCII (0x20-0x7E).</param>
+    /// <param name="width">Total rendered width in PDF points, including the quiet zone.
+    ///   When <c>null</c> the barcode fills the available width.</param>
+    /// <param name="height">Bar height in PDF points (excludes the optional caption).</param>
+    /// <param name="hexColor">Bar (and caption text) colour. Defaults to black.</param>
+    /// <param name="backgroundHexColor">Background colour behind the bars. Defaults to white.</param>
+    /// <param name="showCaption">When <c>true</c>, renders <paramref name="data"/> as a centred caption below the bars.</param>
+    /// <param name="quietZoneModules">Blank margin on each side, in barcode modules. The Code128 spec recommends at least 10.</param>
+    /// <exception cref="ArgumentException"><paramref name="data"/> or a colour argument is null or whitespace.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="width"/> or <paramref name="height"/> is zero or negative.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="data"/> contains a character outside printable ASCII.</exception>
+    public static IContainer Barcode(this IContainer container, string data,
+        double? width = null, double height = 40,
+        string hexColor = "#000000", string backgroundHexColor = "#FFFFFF",
+        bool showCaption = false, double quietZoneModules = 10)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(data);
+        ArgumentException.ThrowIfNullOrWhiteSpace(hexColor);
+        ArgumentException.ThrowIfNullOrWhiteSpace(backgroundHexColor);
+        if (width.HasValue) ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width.Value);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+        ArgumentOutOfRangeException.ThrowIfNegative(quietZoneModules);
+        container.Slot().Child = new BarcodeElement(data, width, height,
+            PdfColor.FromHex(hexColor), PdfColor.FromHex(backgroundHexColor), showCaption, quietZoneModules);
+        return container;
+    }
+
+    // -- QR code -------------------------------------------------------
+
+    /// <summary>
+    /// Places a QR code encoding <paramref name="data"/> (ISO/IEC 18004, byte mode).
+    /// Modules are drawn as vector rectangles, so the code stays crisp at any zoom.
+    /// </summary>
+    /// <param name="container">The container slot to attach the QR code to.</param>
+    /// <param name="data">Text to encode as UTF-8 bytes.</param>
+    /// <param name="size">Side length in PDF points. When <c>null</c> the QR code fills
+    ///   the available width (capped by the available height so it stays square).</param>
+    /// <param name="level">Error correction level. Higher levels tolerate more damage/occlusion at the cost of a denser code.</param>
+    /// <param name="hexColor">Module colour. Defaults to black.</param>
+    /// <param name="backgroundHexColor">Background colour (including the quiet zone). Defaults to white.</param>
+    /// <param name="quietZoneModules">Blank margin on each side, in QR modules. The spec recommends at least 4.</param>
+    /// <exception cref="ArgumentException"><paramref name="data"/> or a colour argument is null or whitespace.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="size"/> is zero or negative, or <paramref name="quietZoneModules"/> is negative.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="data"/> is too long to fit any QR version at the requested error correction level.</exception>
+    public static IContainer QrCode(this IContainer container, string data,
+        double? size = null, QrErrorCorrectionLevel level = QrErrorCorrectionLevel.M,
+        string hexColor = "#000000", string backgroundHexColor = "#FFFFFF",
+        int quietZoneModules = 4)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(data);
+        ArgumentException.ThrowIfNullOrWhiteSpace(hexColor);
+        ArgumentException.ThrowIfNullOrWhiteSpace(backgroundHexColor);
+        if (size.HasValue) ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size.Value);
+        ArgumentOutOfRangeException.ThrowIfNegative(quietZoneModules);
+        container.Slot().Child = new QrCodeElement(data, level, size,
+            PdfColor.FromHex(hexColor), PdfColor.FromHex(backgroundHexColor), quietZoneModules);
+        return container;
     }
 
     // -- Show-if ---------------------------------------------------

@@ -7,17 +7,19 @@ namespace TerraPDF.Sample.Samples;
 // =============================================================================
 //  12. ENCRYPTION & PASSWORD PROTECTION SHOWCASE
 //
-//  Generates FOUR separate PDFs, each demonstrating a different protection
+//  Generates FIVE separate PDFs, each demonstrating a different protection
 //  scenario, then assembles a single "overview" PDF that describes all of them:
 //
-//    12a_open_password.pdf          — requires a password to open
-//    12b_owner_only.pdf             — no open password, but printing/copying locked
-//    12c_print_only.pdf             — opens freely; only printing is permitted
-//    12d_fully_restricted.pdf       — password required; no permissions at all
+//    12a_open_password.pdf          — requires a password to open (AES-256)
+//    12b_owner_only.pdf             — no open password, but printing/copying locked (AES-256)
+//    12c_print_only.pdf             — opens freely; only printing is permitted (AES-256)
+//    12d_fully_restricted.pdf       — password required; no permissions at all (AES-256)
+//    12e_aes128_legacy.pdf          — legacy AES-128 opt-in for pre-2008 viewers
 //    12_encryption_showcase.pdf     — overview document (not encrypted itself)
 //
-//  Shows: EncryptionOptions, PdfPermissions flags, owner vs user passwords,
-//         page layout, tables, callout boxes, colour-coded permission badges.
+//  Shows: EncryptionOptions, EncryptionAlgorithm, PdfPermissions flags, owner
+//         vs user passwords, page layout, tables, callout boxes, colour-coded
+//         permission badges.
 // =============================================================================
 internal static class EncryptionShowcase
 {
@@ -54,7 +56,7 @@ internal static class EncryptionShowcase
         GenerateE(pathE);
 
         // Generate the overview / showcase document
-        GenerateOverview(overviewPath, pathA, pathB, pathC, pathD);
+        GenerateOverview(overviewPath, pathA, pathB, pathC, pathD, pathE);
     }
 
     // =========================================================================
@@ -252,7 +254,7 @@ internal static class EncryptionShowcase
                         LabelValue(info.Item(), "User Password",  "(none — opens without a password prompt)");
                         LabelValue(info.Item(), "Owner Password", "ownerOnly");
                         LabelValue(info.Item(), "Permissions",    "Accessibility extraction only");
-                        LabelValue(info.Item(), "Algorithm",      "AES-128 CBC  (PDF Standard Security Handler Rev 4)");
+                        LabelValue(info.Item(), "Algorithm",      "AES-256 CBC  (PDF Standard Security Handler Rev 6)");
                     });
 
                     SectionHeader(col.Item(), "What this means");
@@ -261,7 +263,7 @@ internal static class EncryptionShowcase
                     {
                         t.Span("This document opens ").FontColor(Muted);
                         t.Span("without any password prompt").Bold().FontColor(Success);
-                        t.Span(", yet its content is still encrypted with AES-128. "
+                        t.Span(", yet its content is still encrypted with AES-256. "
                              + "The PDF viewer enforces the permission flags — "
                              + "printing, copying, and editing are all ").FontColor(Muted);
                         t.Span("disabled").Bold().FontColor(Danger);
@@ -337,7 +339,7 @@ internal static class EncryptionShowcase
                         LabelValue(info.Item(), "User Password",  "printme");
                         LabelValue(info.Item(), "Owner Password", "printAdmin");
                         LabelValue(info.Item(), "Permissions",    "Print (high + low quality) + Accessibility");
-                        LabelValue(info.Item(), "Algorithm",      "AES-128 CBC  (PDF Standard Security Handler Rev 4)");
+                        LabelValue(info.Item(), "Algorithm",      "AES-256 CBC  (PDF Standard Security Handler Rev 6)");
                     });
 
                     SectionHeader(col.Item(), "What this means");
@@ -416,7 +418,7 @@ internal static class EncryptionShowcase
                         LabelValue(info.Item(), "User Password",  "viewonly");
                         LabelValue(info.Item(), "Owner Password", "superadmin");
                         LabelValue(info.Item(), "Permissions",    "None — view only");
-                        LabelValue(info.Item(), "Algorithm",      "AES-128 CBC  (PDF Standard Security Handler Rev 4)");
+                        LabelValue(info.Item(), "Algorithm",      "AES-256 CBC  (PDF Standard Security Handler Rev 6)");
                     });
 
                     SectionHeader(col.Item(), "What this means");
@@ -461,7 +463,7 @@ internal static class EncryptionShowcase
     //  Overview / showcase document  (not encrypted)
     // =========================================================================
     private static void GenerateOverview(
-        string path, string pathA, string pathB, string pathC, string pathD)
+        string path, string pathA, string pathB, string pathC, string pathD, string pathE)
     {
         // Permission rows for the master reference table
         (string Flag, string Bit, string Description)[] allFlags =
@@ -479,17 +481,18 @@ internal static class EncryptionShowcase
         // Scenario summary table
         (string File, string UserPwd, string OwnerPwd, string Permissions, string UseCase)[] scenarios =
         [
-            ("12a", "user123",   "admin123",   "All",              "Protect authorship; allow all viewer operations"),
-            ("12b", "(none)",    "ownerOnly",  "Accessibility",    "Distribute freely; prevent print / copy"),
-            ("12c", "printme",   "printAdmin", "Print only",       "Allow printing; prevent digital re-use"),
-            ("12d", "viewonly",  "superadmin", "None",             "Maximum restriction — view on screen only"),
+            ("12a", "user123",   "admin123",   "All",              "Protect authorship; allow all viewer operations (AES-256)"),
+            ("12b", "(none)",    "ownerOnly",  "Accessibility",    "Distribute freely; prevent print / copy (AES-256)"),
+            ("12c", "printme",   "printAdmin", "Print only",       "Allow printing; prevent digital re-use (AES-256)"),
+            ("12d", "viewonly",  "superadmin", "None",             "Maximum restriction — view on screen only (AES-256)"),
+            ("12e", "legacy123", "legacyAdmin","All",              "Legacy AES-128 opt-in for pre-2008 viewers"),
         ];
 
         Document.Create(doc =>
         {
             doc.MetadataTitle("TerraPDF — Encryption & Password Protection Showcase");
             doc.MetadataAuthor("TerraPDF Engineering Team");
-            doc.MetadataSubject("Demonstrates AES-128 PDF encryption, password protection, and PdfPermissions flags");
+            doc.MetadataSubject("Demonstrates AES-256 PDF encryption (with legacy AES-128 support), password protection, and PdfPermissions flags");
             doc.MetadataKeywords("pdf; encryption; password; permissions; AES; security; TerraPDF");
             doc.MetadataCreator("TerraPDF Sample Generator");
 
@@ -511,11 +514,12 @@ internal static class EncryptionShowcase
                     // ── Hero banner ──────────────────────────────────────────
                     col.Item().RoundedBox(6, Brand, Brand).Padding(18).Column(hero =>
                     {
-                        hero.Item().Text("AES-128 PDF Encryption")
+                        hero.Item().Text("AES-256 PDF Encryption")
                             .Bold().FontSize(20).FontColor(Color.White);
                         hero.Item().PaddingTop(4).Text(
                             "Zero-dependency password protection using the PDF Standard Security "
-                          + "Handler (Revision 4). Implemented entirely with System.Security.Cryptography.")
+                          + "Handler, Revision 6 by default (legacy Revision 4 / AES-128 available). "
+                          + "Implemented entirely with System.Security.Cryptography.")
                             .FontSize(9).FontColor("#B8D0E8");
                     });
 
@@ -524,14 +528,16 @@ internal static class EncryptionShowcase
 
                     col.Item().Text(t =>
                     {
-                        t.Span("TerraPDF derives a 16-byte ").FontColor(Muted);
+                        t.Span("By default, TerraPDF derives a 32-byte ").FontColor(Muted);
                         t.Span("File Encryption Key (FEK)").Bold().FontColor(Brand);
-                        t.Span(" from your passwords using the PDF-mandated MD5 key-derivation "
-                             + "algorithm (50 rounds). Each PDF object — pages, images, content "
-                             + "streams — is then encrypted with a unique ").FontColor(Muted);
-                        t.Span("per-object AES-128 CBC key").Bold().FontColor(Brand);
+                        t.Span(" from your passwords using the PDF 2.0 SHA-2 based key-derivation "
+                             + "algorithm (Algorithm 2.B, Revision 6). Each PDF object — pages, images, "
+                             + "content streams, metadata, bookmark titles, hyperlink URIs — is then "
+                             + "encrypted with a unique ").FontColor(Muted);
+                        t.Span("per-object AES-256 CBC key").Bold().FontColor(Brand);
                         t.Span(" derived from the FEK plus the object number. "
-                             + "A random 16-byte IV is prepended to every encrypted payload.")
+                             + "Set Algorithm = EncryptionAlgorithm.Aes128 to opt into the legacy "
+                             + "16-byte-key, MD5-derived Revision 4 handler instead (see 12e).")
                          .FontColor(Muted);
                     });
 
@@ -551,13 +557,13 @@ internal static class EncryptionShowcase
 
                         string[][] rows =
                         [
-                            ["Cipher",             "AES-128 CBC (per PDF §7.6.5)"],
+                            ["Cipher",             "AES-256 CBC (per ISO 32000-2 §7.6.5)"],
                             ["IV",                 "16 random bytes — unique per object"],
-                            ["Key derivation",     "MD5 × 51 rounds (PDF §7.6.3.3 Algorithm 2)"],
-                            ["O entry",            "Algorithm 3 — owner password verifier"],
-                            ["U entry",            "Algorithm 5 (Rev 4) — user password verifier"],
-                            ["Handler",            "PDF Standard Security Handler, Revision 4"],
-                            ["PDF version",        "1.6 (minimum for AES encryption)"],
+                            ["Key derivation",     "SHA-2 based, Algorithm 2.B (ISO 32000-2, Revision 6)"],
+                            ["O/U entries",        "48-byte verifiers, with /OE + /UE key-wrapping"],
+                            ["Handler",            "PDF Standard Security Handler, Revision 6"],
+                            ["PDF version",        "2.0 (required for Revision 6)"],
+                            ["Legacy mode",        "Algorithm = EncryptionAlgorithm.Aes128 → AES-128 CBC, Revision 4, PDF 1.6"],
                             ["Dependencies",       "System.Security.Cryptography only — no packages"],
                         ];
 
@@ -575,8 +581,8 @@ internal static class EncryptionShowcase
                         }
                     });
 
-                    // ── Four scenarios ───────────────────────────────────────
-                    SectionHeader(col.Item(), "Four Protection Scenarios (see companion files)");
+                    // ── Five scenarios ───────────────────────────────────────
+                    SectionHeader(col.Item(), "Five Protection Scenarios (see companion files)");
 
                     col.Item().Table(tbl =>
                     {
@@ -800,7 +806,7 @@ internal static class EncryptionShowcase
         page.Footer().BorderTop(0.5, GridLine).PaddingTop(6).Row(row =>
         {
             row.RelativeItem()
-               .Text("TerraPDF — AES-128 Encryption Showcase")
+               .Text("TerraPDF — AES-256 Encryption Showcase")
                .FontSize(8).FontColor(Muted);
             row.AutoItem().Text(t =>
             {

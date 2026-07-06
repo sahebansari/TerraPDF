@@ -16,7 +16,7 @@
 
      <!-- ── NuGet package identity ───────────────────────────────────────── -->
      <PackageId>TerraPDF</PackageId>
-      <Version>1.4.0</Version>
+      <Version>1.5.0</Version>
       <Authors>Saheb Ansari</Authors>
       <Copyright>Copyright © 2025-2026 TerraPDF Contributors</Copyright>
       <PackageProjectUrl>https://github.com/sahebansari/TerraPDF</PackageProjectUrl>
@@ -26,10 +26,11 @@
        underline, strikethrough, custom line-height), multi-span mixed formatting,
        Column / Row / Table layouts, PNG and JPEG image embedding, rounded and per-edge
        borders, explicit page breaks, clickable hyperlink annotations, headers, footers,
-       page numbers, and a full Material Design colour palette — with no native binaries
-       and no third-party runtime dependencies.
+       page numbers, Code128 barcodes, QR codes (ISO/IEC 18004), and a full Material
+       Design colour palette — with no native binaries and no third-party runtime
+       dependencies.
      </Description>
-     <PackageTags>pdf;pdf-generation;document;reporting;fluent-api;invoice;table;image;no-dependency;zero-dependency;dotnet;csharp</PackageTags>
+     <PackageTags>pdf;pdf-generation;document;reporting;fluent-api;invoice;table;image;barcode;qrcode;qr-code;code128;no-dependency;zero-dependency;dotnet;csharp</PackageTags>
      <PackageLicenseExpression>MIT</PackageLicenseExpression>
      <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
      <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -45,8 +46,8 @@
      <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
       <Title>TerraPDF - A lightweight PDF library for dotnet developers</Title>
       <PackageIcon>icon.png</PackageIcon>
-       <AssemblyVersion>1.4.0</AssemblyVersion>
-       <FileVersion>1.4.0</FileVersion>
+       <AssemblyVersion>1.5.0</AssemblyVersion>
+       <FileVersion>1.5.0</FileVersion>
   </PropertyGroup>
 
   <!-- Bundle the README into the NuGet package -->

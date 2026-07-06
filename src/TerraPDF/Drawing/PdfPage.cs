@@ -115,6 +115,33 @@ internal sealed class PdfPage
         _ops.Append("f\n");
     }
 
+    /// <summary>
+    /// Fills many same-colour rectangles as a single path: one colour operator,
+    /// one <c>re</c> per rectangle, one trailing <c>f</c>. Used by barcode/QR
+    /// rendering where a symbol can have thousands of same-colour modules —
+    /// avoids emitting a redundant colour-set + fill pair per module.
+    /// Rectangles with non-positive width or height are skipped. No-op when
+    /// <paramref name="rects"/> is empty.
+    /// </summary>
+    internal void AddFilledRects(IEnumerable<(double X, double Y, double W, double H)> rects, PdfColor fillColor)
+    {
+        bool wroteColor = false;
+        bool wroteAny   = false;
+        foreach (var (x, y, w, h) in rects)
+        {
+            if (w <= 0 || h <= 0) continue;
+            if (!wroteColor)
+            {
+                _ops.Append(CultureInfo.InvariantCulture, $"{C(fillColor.R)} {C(fillColor.G)} {C(fillColor.B)} rg\n");
+                wroteColor = true;
+            }
+            double pdfY = Height - y - h;
+            _ops.Append(CultureInfo.InvariantCulture, $"{F(x)} {F(pdfY)} {F(w)} {F(h)} re\n");
+            wroteAny = true;
+        }
+        if (wroteAny) _ops.Append("f\n");
+    }
+
     /// <summary>Draws a stroked (outline-only) rectangle.</summary>
     internal void AddStrokedRect(double x, double y, double w, double h,
         PdfColor strokeColor, double lineWidth = 1)

@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] - 2026-07-06
+
+### Added (barcodes & QR codes)
+- **`container.Barcode(data, ...)`** — Code128 (Subset B) barcode generation,
+  encoding printable ASCII (0x20-0x7E). Supports an explicit or auto-fill
+  width, custom module/background colour, an optional human-readable caption
+  rendered below the bars, and a configurable quiet zone.
+- **`container.QrCode(data, ...)`** — from-scratch ISO/IEC 18004 QR code
+  generator: byte-mode encoding, automatic version selection (1-40), all four
+  error correction levels (`QrErrorCorrectionLevel.L/M/Q/H`), Reed-Solomon
+  error correction, and full mask-pattern penalty scoring. Supports an
+  explicit or auto-fill size, custom module/background colour, and a
+  configurable quiet zone.
+- Both render as **vector-filled rectangles** (one rect per bar / per
+  contiguous run of dark QR modules), matching the existing `VectorCanvas`
+  rendering style — crisp at any zoom, no raster image pipeline, and
+  placeable anywhere an `IContainer` is exposed (`Column`, `Row`, `Table`
+  cell, header, footer).
+- New `PdfPage.AddFilledRects` batch primitive: emits one colour operator
+  followed by many `re` ops and a single trailing fill, avoiding a redundant
+  colour-set/fill pair per module on symbols with thousands of modules.
+
+---
+
 ## [1.4.0] - 2026-07-04
 
 ### Added (encryption)
