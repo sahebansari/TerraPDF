@@ -1,4 +1,4 @@
-﻿# Runs on every push and PR to main:
+﻿# Runs on every push and PR to master:
 #   1. Build (Release, multi-target)
 #   2. Run unit tests with coverage
 #   3. Dry-run dotnet pack to verify the package can be built
@@ -8,9 +8,9 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 jobs:
   build-and-test:
@@ -29,6 +29,7 @@ jobs:
           dotnet-version: |
             8.x
             9.x
+            10.x
 
       - name: Restore
         run: dotnet restore

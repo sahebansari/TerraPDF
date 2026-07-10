@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Support current LTS (.NET 8) and latest stable (.NET 9) -->
-    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <!-- Support .NET 8 (LTS), .NET 9 (STS) and .NET 10 (current LTS) -->
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
 
     <!-- Quality gates -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -16,21 +16,24 @@
 
      <!-- ── NuGet package identity ───────────────────────────────────────── -->
      <PackageId>TerraPDF</PackageId>
-      <Version>1.5.0</Version>
+      <Version>1.5.1</Version>
       <Authors>Saheb Ansari</Authors>
       <Copyright>Copyright © 2025-2026 TerraPDF Contributors</Copyright>
       <PackageProjectUrl>https://github.com/sahebansari/TerraPDF</PackageProjectUrl>
      <Description>
-       A lightweight, zero-dependency, pure C# library for generating PDF 1.7 documents
-       with a fluent, composable API. Features include rich text styling (bold, italic,
-       underline, strikethrough, custom line-height), multi-span mixed formatting,
-       Column / Row / Table layouts, PNG and JPEG image embedding, rounded and per-edge
-       borders, explicit page breaks, clickable hyperlink annotations, headers, footers,
-       page numbers, Code128 barcodes, QR codes (ISO/IEC 18004), and a full Material
-       Design colour palette — with no native binaries and no third-party runtime
-       dependencies.
+       A free, open-source (MIT) C# PDF library for .NET — generate PDF documents
+       (invoices, reports, receipts, labels, certificates) from code with a fluent,
+       composable API. Lightweight, zero-dependency, and pure managed C#: no native
+       binaries, no HTML-to-PDF browser engine, free for commercial use. Features
+       include rich text styling (bold, italic, underline, strikethrough, custom
+       line-height), multi-span mixed formatting, Column / Row / Table layouts,
+       PNG and JPEG image embedding, rounded and per-edge borders, explicit page
+       breaks, clickable hyperlink annotations, headers, footers, page numbers,
+       AES-256 encryption, Code128 barcodes, QR codes (ISO/IEC 18004), and a full
+       Material Design colour palette. Runs on Windows, Linux, macOS, Docker,
+       Azure, and AWS on .NET 8, 9, and 10.
      </Description>
-     <PackageTags>pdf;pdf-generation;document;reporting;fluent-api;invoice;table;image;barcode;qrcode;qr-code;code128;no-dependency;zero-dependency;dotnet;csharp</PackageTags>
+     <PackageTags>pdf;pdf-generation;pdf-library;create-pdf;generate-pdf;pdf-writer;pdf-creator;free;open-source;mit;document;reporting;report;fluent-api;invoice;invoice-generator;table;image;barcode;qrcode;qr-code;code128;encryption;aes-256;no-dependency;zero-dependency;cross-platform;linux;docker;aspnetcore;dotnet;csharp</PackageTags>
      <PackageLicenseExpression>MIT</PackageLicenseExpression>
      <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
      <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -44,10 +47,10 @@
      <IncludeSymbols>true</IncludeSymbols>
      <SymbolPackageFormat>snupkg</SymbolPackageFormat>
      <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-      <Title>TerraPDF - A lightweight PDF library for dotnet developers</Title>
+      <Title>TerraPDF — Free C# PDF Library for .NET (PDF Generation)</Title>
       <PackageIcon>icon.png</PackageIcon>
-       <AssemblyVersion>1.5.0</AssemblyVersion>
-       <FileVersion>1.5.0</FileVersion>
+       <AssemblyVersion>1.5.1</AssemblyVersion>
+       <FileVersion>1.5.1</FileVersion>
   </PropertyGroup>
 
   <!-- Bundle the README into the NuGet package -->

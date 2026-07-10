@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/samples/">
+    <Project Path="samples/TerraPDF.Sample/TerraPDF.Sample.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/TerraPDF/TerraPDF.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TerraPDF.Tests/TerraPDF.Tests.csproj" />
+  </Folder>
+</Solution>

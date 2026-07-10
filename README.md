@@ -1,6 +1,6 @@
-# TerraPDF 
+# TerraPDF — Free C# PDF Library for .NET
 
-A free, pure C# library designed for fast and reliable PDF generation.
+**A free, open-source (MIT) C# PDF library for creating PDF documents in .NET** — generate invoices, reports, receipts, statements, labels, and certificates from C# code with a fluent API. 100% managed C#, zero dependencies, and free for personal **and commercial** use: no watermarks, no page limits, no paid tiers.
 
 ![TerraPDF](https://raw.githubusercontent.com/sahebansari/TerraPDF/master/logo.png)
 
@@ -14,13 +14,35 @@ A free, pure C# library designed for fast and reliable PDF generation.
 > **New in 1.5.0:** 
 Code128 barcodes and QR codes (ISO/IEC 18004, versions 1-40, all four error correction levels) via `container.Barcode(...)` and `container.QrCode(...)` — rendered as vector-filled rectangles, no raster image pipeline, placeable anywhere a `Column`, `Row`, or `Table` cell can go.
 
-**TerraPDF** is a lightweight, zero-dependency, pure C# library for generating professional PDF 1.7 documents programmatically. 
-It provides a fluent, composable API that covers the full document-authoring lifecycle — from page layout and 
-rich text to tables, images, hyperlinks, and multi-page pagination — with no native binaries, no third-party 
+**TerraPDF** is a lightweight, zero-dependency, pure C# library for generating professional PDF 1.7 documents programmatically.
+It provides a fluent, composable API that covers the full document-authoring lifecycle — from page layout and
+rich text to tables, images, hyperlinks, and multi-page pagination — with no native binaries, no third-party
 runtime packages, and no licensing restrictions.
 
+---
+
+## Why TerraPDF?
+
+- **Truly free** — MIT licensed, free for commercial use. No royalties, no watermarks, no page limits, no "community edition" restrictions, no revenue caps.
+- **Pure C#, zero dependencies** — no native binaries (no `libgdiplus`, no Chromium, no wkhtmltopdf), no third-party NuGet packages. The entire PDF writer is managed code.
+- **Cross-platform** — runs anywhere .NET runs: Windows, Linux, macOS, Docker containers, Azure Functions, AWS Lambda, ASP.NET Core web apps, console apps, and background services.
+- **Modern .NET** — targets .NET 8 (LTS), .NET 9, and .NET 10 (LTS).
+- **Code-first, not HTML-to-PDF** — documents are composed from typed C# layout primitives (`Column`, `Row`, `Table`), so output is deterministic and fast — no browser engine to install or babysit.
+- **Batteries included** — text styling, tables, images, hyperlinks, bookmarks, table of contents, headers/footers, page numbers, vector graphics, Code128 barcodes, QR codes, and AES-256 encryption.
+
+## Common use cases
+
+- Generate **invoice PDFs** in C# / ASP.NET Core
+- Export **reports** and **statements** to PDF from .NET applications
+- Create **receipts**, **delivery notes**, and **order confirmations**
+- Print **shipping labels** with Code128 barcodes and QR codes
+- Produce **certificates**, **letters**, and **contracts** from templates
+- Server-side PDF generation in **Docker**, **Azure**, and **AWS** — no native dependencies to install
+
+## Features
+
 - No native dependencies, no third-party packages
-- Targets **.NET 8** and **.NET 9**
+- Targets **.NET 8**, **.NET 9** and **.NET 10**
 - Text styling — bold, italic, bold-italic, strikethrough, underline, font size, colour
 - Three built-in font families — Helvetica, Times, Courier — via `FontFamily()`, no embedding needed
 - Configurable line-height multiplier per text block
@@ -132,7 +154,24 @@ For complete API reference and detailed guides, visit the [docs](https://github.
 
 ---
 
+## FAQ
 
+**Is TerraPDF really free for commercial use?**
+Yes. TerraPDF is released under the [MIT license](https://github.com/sahebansari/TerraPDF/blob/master/LICENSE) — you can use it in closed-source and commercial products at no cost, with no revenue caps, royalties, watermarks, or feature-limited tiers.
+
+**How does TerraPDF compare to iTextSharp, QuestPDF, or PDFsharp?**
+iText (iTextSharp) is AGPL-licensed, which requires a commercial license for most closed-source use. QuestPDF's Community license is free only below a company-revenue threshold. PDFsharp is MIT like TerraPDF, but uses an imperative drawing model. TerraPDF offers a fluent, composable, code-first API under a plain MIT license with zero runtime dependencies.
+
+**Does TerraPDF convert HTML to PDF?**
+No. TerraPDF is a code-first PDF generator: you compose documents from C# layout primitives (`Column`, `Row`, `Table`, `Text`, `Image`). That means no headless browser, deterministic output, and much faster rendering — but if your source content is HTML, an HTML-to-PDF converter is a better fit.
+
+**Does it run on Linux, macOS, and in Docker?**
+Yes. TerraPDF is 100% managed C# with no native binaries, so it runs on any platform supported by .NET 8/9/10 — including Alpine-based Docker images, Azure Functions, and AWS Lambda — with nothing extra to install.
+
+**Can it create password-protected PDFs?**
+Yes. Documents can be encrypted with AES-256 (default) or AES-128, with user/owner passwords and fine-grained permission flags (printing, copying, editing, etc.).
+
+---
 
 ## Building from Source
 
@@ -143,7 +182,8 @@ dotnet build
 dotnet test
 ```
 
-Requires **.NET 8 SDK** or later.
+Requires the **.NET 10 SDK** (builds all targets), plus the .NET 8 and .NET 9
+runtimes to execute the full multi-framework test suite.
 
 ---
 
