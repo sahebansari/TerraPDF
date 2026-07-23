@@ -25,4 +25,8 @@
     <ProjectReference Include="..\..\src\TerraPDF\TerraPDF.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="TestAssets\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -2,7 +2,7 @@
 
 TerraPDF supports **PNG** and **JPEG** image embedding with automatic aspect-ratio
 preservation. The format is detected from the data itself (magic bytes), so the
-file extension does not matter. In 1.4.0, images can also be supplied directly
+file extension does not matter. Images can also be supplied directly
 from `byte[]` or `Stream` instances, which is useful for embedded resources and
 generated content.
 

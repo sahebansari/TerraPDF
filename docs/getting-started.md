@@ -12,11 +12,11 @@ dotnet add package TerraPDF
 |-----------|----------|
 | `TerraPDF.Core` | Fluent API entry points, descriptors, extension methods |
 | `TerraPDF.Infra` | `IContainer`, `IDocument`, `IComponent` interfaces |
-| `TerraPDF.Helpers` | `Color`, `PageSize`, `Unit`, `TextStyle` |
+| `TerraPDF.Helpers` | `Color`, `PageSize`, `Unit`, `TextStyle`, `FontFamily` |
 
 ---
 
-TerraPDF 1.4.0 brings a few notable upgrades for document authorship: AES-256 encryption is now the default, images can be supplied from bytes or streams, anchor-based bookmarks track rendered content automatically, and the multi-span text API uses immutable `TextStyle` callbacks.
+TerraPDF encrypts documents with AES-256 by default, accepts images from bytes or streams, tracks anchor-based bookmarks against rendered content automatically, and exposes a multi-span text API built on immutable `TextStyle` callbacks.
 
 ## Minimal Example
 
@@ -125,6 +125,7 @@ composer.PublishPdf(stream);
 - [Vector Graphics](vector-graphics.md) — Canvas API, lines, shapes, Bézier paths, polygons, grids, charts
 - [Images](images.md) — PNG and JPEG embedding
 - [Encryption](encryption.md) — AES-256 by default, plus AES-128 compatibility mode and permission flags
+- [Custom Fonts](custom-fonts.md) — embed TrueType fonts for brand typefaces and full Unicode
 - [Table of Contents](table-of-contents.md) — headings, automatic TOC generation, internal links
 - [Bookmarks](bookmarks.md) — PDF outlines / hierarchical navigation tree
 - [Unicode & Character Encoding](unicode-and-encoding.md) — WinAnsiEncoding coverage, Windows-1252 specials, Latin-1 Supplement, avoiding `?` characters

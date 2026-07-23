@@ -60,13 +60,43 @@ internal sealed class PdfPage
         PdfColor color, PdfFontFamily family = PdfFontFamily.Helvetica,
         bool bold = false, bool italic = false)
     {
+        string fontAlias = PdfFonts.Alias(family, bold, italic);
+        EmitFontColorAndPosition(fontAlias, fontSize, color, x, y);
+        _ops.Append(CultureInfo.InvariantCulture, $"({EscapeForPdfString(text)}) Tj\n");
+    }
+
+    /// <summary>
+    /// Shows <paramref name="text"/> set in a registered custom (embedded) font.
+    /// Uses <c>Identity-H</c> encoding: each Unicode scalar value (surrogate pairs
+    /// kept intact) is mapped through the font's own <c>cmap</c> to a glyph ID and
+    /// emitted as a 2-byte big-endian hex code, recording the glyph as used so
+    /// <see cref="PdfDocument"/> can build a minimal <c>/W</c> width array and
+    /// <c>/ToUnicode</c> CMap for just the glyphs this document actually shows.
+    /// </summary>
+    internal void ShowTextAtCustomFont(string text, double x, double y, double fontSize,
+        PdfColor color, TrueType.CustomFontVariant variant)
+    {
+        string fontAlias = GetOrAddCustomFontAlias(variant);
+        EmitFontColorAndPosition(fontAlias, fontSize, color, x, y);
+        _ops.Append(EncodeIdentityHHex(text, variant));
+        _ops.Append(" Tj\n");
+    }
+
+    /// <summary>
+    /// Emits the colour (<c>rg</c>), font (<c>Tf</c>), and position (<c>Td</c>) operators
+    /// shared by every text-showing call, re-emitting colour/font only when they differ
+    /// from the previous call in the same text object. Shared by <see cref="ShowTextAt"/>
+    /// and <see cref="ShowTextAtCustomFont"/> so the two paths stay byte-identical for the
+    /// operators they have in common.
+    /// </summary>
+    private void EmitFontColorAndPosition(string fontAlias, double fontSize, PdfColor color, double x, double y)
+    {
         if (_textColor is null || !_textColor.Value.Equals(color))
         {
             _ops.Append(CultureInfo.InvariantCulture, $"{C(color.R)} {C(color.G)} {C(color.B)} rg\n");
             _textColor = color;
         }
 
-        string fontAlias = PdfFonts.Alias(family, bold, italic);
         if (fontAlias != _textFontAlias || fontSize != _textFontSize)
         {
             _ops.Append(CultureInfo.InvariantCulture, $"/{fontAlias} {F(fontSize)} Tf\n");
@@ -81,12 +111,62 @@ internal sealed class PdfPage
         _ops.Append(CultureInfo.InvariantCulture, $"{F(pdfX - _textTdX)} {F(pdfY - _textTdY)} Td\n");
         _textTdX = pdfX;
         _textTdY = pdfY;
+    }
 
-        _ops.Append(CultureInfo.InvariantCulture, $"({EscapeForPdfString(text)}) Tj\n");
+    /// <summary>
+    /// Encodes <paramref name="text"/> as an Identity-H hex string token, e.g. <c>&lt;0003001A&gt;</c>.
+    /// Codepoints are decoded and Devanagari-reordered via <see cref="TrueType.DevanagariReordering.DecodeAndReorder"/>,
+    /// then mapped to glyphs (with conjunct-ligature substitution) via
+    /// <see cref="TrueType.DevanagariConjuncts.MapToGlyphs"/>, so glyph order here always
+    /// matches what <see cref="TrueType.CustomFontVariant.MeasureWidth"/> measured.
+    /// </summary>
+    private string EncodeIdentityHHex(string text, TrueType.CustomFontVariant variant)
+    {
+        var codepoints = TrueType.DevanagariReordering.DecodeAndReorder(text);
+        var glyphs = TrueType.DevanagariConjuncts.MapToGlyphs(codepoints, variant.Font);
+        var sb = new StringBuilder(glyphs.Count * 4 + 2);
+        sb.Append('<');
+        foreach (var (gid, codepoint) in glyphs)
+        {
+            RecordCustomGlyphUsage(variant, gid, codepoint);
+            sb.Append(gid.ToString("X4", CultureInfo.InvariantCulture));
+        }
+        sb.Append('>');
+        return sb.ToString();
     }
 
     /// <summary>Closes the current text object (<c>ET</c>).</summary>
     internal void EndTextObject() => _ops.Append("ET\n");
+
+    // --------------------------------------------------------------
+    //  Custom (embedded) font resources
+    // --------------------------------------------------------------
+
+    private readonly Dictionary<TrueType.CustomFontVariant, string> _customFontAliasByVariant = new();
+
+    /// <summary>Custom font resources used on this page: page-local alias → variant.</summary>
+    internal Dictionary<string, TrueType.CustomFontVariant> CustomFontObjects { get; } = new();
+
+    /// <summary>Glyph IDs shown on this page per custom font variant, each mapped to a representative Unicode codepoint (for <c>/ToUnicode</c>).</summary>
+    internal Dictionary<TrueType.CustomFontVariant, Dictionary<ushort, int>> CustomGlyphUsage { get; } = new();
+
+    private string GetOrAddCustomFontAlias(TrueType.CustomFontVariant variant)
+    {
+        if (_customFontAliasByVariant.TryGetValue(variant, out string? existing))
+            return existing;
+
+        string alias = $"Cf{_customFontAliasByVariant.Count + 1}";
+        _customFontAliasByVariant[variant] = alias;
+        CustomFontObjects[alias] = variant;
+        return alias;
+    }
+
+    private void RecordCustomGlyphUsage(TrueType.CustomFontVariant variant, ushort glyphId, int codepoint)
+    {
+        if (!CustomGlyphUsage.TryGetValue(variant, out var map))
+            CustomGlyphUsage[variant] = map = new Dictionary<ushort, int>();
+        map.TryAdd(glyphId, codepoint);
+    }
 
     // --------------------------------------------------------------
     //  Drawing operations (primitive overloads - used by new API)

@@ -205,6 +205,79 @@ internal sealed class PdfDocument
             pageImageMaps.Add(imgMap);
         }
 
+        // Custom (embedded) fonts — deduplicated document-wide by variant identity,
+        // mirroring the image dedup above: a font is embedded once regardless of how
+        // many pages (or how many times per page) it is used. Glyph usage is merged
+        // across every page first so the /W width array and /ToUnicode CMap cover
+        // exactly the glyphs this document actually shows — no more, no less.
+        var customGlyphUsageAll = new Dictionary<TrueType.CustomFontVariant, Dictionary<ushort, int>>();
+        foreach (var page in _pages)
+        {
+            foreach (var (variant, glyphs) in page.CustomGlyphUsage)
+            {
+                if (!customGlyphUsageAll.TryGetValue(variant, out var merged))
+                    customGlyphUsageAll[variant] = merged = new Dictionary<ushort, int>();
+                foreach (var (gid, codepoint) in glyphs)
+                    merged.TryAdd(gid, codepoint);
+            }
+        }
+
+        var customFontObjectIds = new Dictionary<TrueType.CustomFontVariant, int>();
+        foreach (var (variant, glyphs) in customGlyphUsageAll)
+        {
+            // FontFile2: the whole original TrueType file, Flate-compressed.
+            // /Length1 is the required uncompressed byte length (PDF §9.9).
+            int fontFileId = nextId++;
+            byte[] rawFont = variant.Font.RawData;
+            byte[] compressedFont = Compress(rawFont);
+            byte[] fontFileData = _encryption is not null
+                ? _encryption.EncryptBytes(compressedFont, fontFileId, 0)
+                : compressedFont;
+            binaryObjects.Add((fontFileId,
+                $"<< /Length1 {rawFont.Length} /Filter /FlateDecode /Length {fontFileData.Length} >>",
+                fontFileData));
+
+            // FontDescriptor
+            int descriptorId = nextId++;
+            var (xMin, yMin, xMax, yMax) = variant.Font.FontBBox;
+            objects.Add((descriptorId,
+                $"<< /Type /FontDescriptor /FontName /{variant.BaseFontName} " +
+                $"/Flags {variant.DescriptorFlags} " +
+                $"/FontBBox [{Inv(xMin)} {Inv(yMin)} {Inv(xMax)} {Inv(yMax)}] " +
+                $"/ItalicAngle {Inv(variant.Font.ItalicAngle)} " +
+                $"/Ascent {Inv(variant.Font.Ascent)} /Descent {Inv(variant.Font.Descent)} " +
+                $"/CapHeight {Inv(variant.Font.CapHeight)} /StemV {variant.StemV} " +
+                $"/FontFile2 {fontFileId} 0 R >>"));
+
+            // CIDFontType2 descendant — /W built only from glyph IDs actually used
+            // anywhere in the document (CIDToGIDMap /Identity: the CID a content
+            // stream shows *is* the glyph index into the embedded font, because the
+            // whole font — not a renumbered subset — is embedded).
+            int cidFontId = nextId++;
+            string wArray = string.Join(" ", glyphs.Keys.OrderBy(g => g)
+                .Select(gid => $"{gid} [{Inv(variant.Font.GetAdvanceWidthInEm(gid))}]"));
+            objects.Add((cidFontId,
+                $"<< /Type /Font /Subtype /CIDFontType2 /BaseFont /{variant.BaseFontName} " +
+                $"/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> " +
+                $"/FontDescriptor {descriptorId} 0 R /DW 1000 /W [{wArray}] /CIDToGIDMap /Identity >>"));
+
+            // ToUnicode CMap (GID -> Unicode) so copy/paste and text extraction work.
+            int toUnicodeId = nextId++;
+            byte[] cmapCompressed = Compress(Encoding.ASCII.GetBytes(BuildToUnicodeCMap(glyphs)));
+            byte[] cmapData = _encryption is not null
+                ? _encryption.EncryptBytes(cmapCompressed, toUnicodeId, 0)
+                : cmapCompressed;
+            binaryObjects.Add((toUnicodeId, $"<< /Filter /FlateDecode /Length {cmapData.Length} >>", cmapData));
+
+            // Type0 composite font — the object actually referenced from /Resources /Font.
+            int type0Id = nextId++;
+            objects.Add((type0Id,
+                $"<< /Type /Font /Subtype /Type0 /BaseFont /{variant.BaseFontName} " +
+                $"/Encoding /Identity-H /DescendantFonts [{cidFontId} 0 R] /ToUnicode {toUnicodeId} 0 R >>"));
+
+            customFontObjectIds[variant] = type0Id;
+        }
+
         // Content streams (one per page) — always Flate-compressed.
         // When encrypted, compression happens first (the /Filter describes the
         // decoded stream; encryption is transparent to filters per PDF §7.6.1),
@@ -300,6 +373,14 @@ internal sealed class PdfDocument
                   " >> "
                 : string.Empty;
 
+            // Custom-font entries this page actually uses, resolved to their
+            // document-wide-deduplicated Type0 object — appended alongside the
+            // (unchanged) standard-font resources every page already carries.
+            string customFontResources = p.CustomFontObjects.Count > 0
+                ? " " + string.Join(" ", p.CustomFontObjects.Select(kv =>
+                    $"/{kv.Key} {customFontObjectIds[kv.Value]} 0 R"))
+                : string.Empty;
+
             var allAnnotIds = pageAnnotIds[i].Concat(pageInternalAnnotIds[i]).ToList();
             string annotStr = allAnnotIds.Count > 0
                 ? "/Annots [" + string.Join(" ", allAnnotIds.Select(id => $"{id} 0 R")) + "] "
@@ -310,7 +391,7 @@ internal sealed class PdfDocument
                 $"/MediaBox [0 0 {Inv(p.Width)} {Inv(p.Height)}] " +
                 $"/Contents {contentIds[i]} 0 R " +
                 $"{annotStr}" +
-                $"/Resources << /Font << {fontResources} >> {xObjectDict}>> >>"));
+                $"/Resources << /Font << {fontResources}{customFontResources} >> {xObjectDict}>> >>"));
         }
 
         // Outlines (bookmarks)
@@ -421,6 +502,45 @@ internal sealed class PdfDocument
             zlib.Flush();
             zlib.Dispose();
             return ms.ToArray();
+        }
+
+        /// <summary>
+        /// Builds a <c>/ToUnicode</c> CMap stream (PDF §9.10.3) mapping each used glyph ID
+        /// to its Unicode codepoint, chunked into ≤100-entry <c>beginbfchar</c> blocks per
+        /// the conventional CMap limit. Codepoints above the BMP are emitted as their
+        /// UTF-16BE surrogate pair, matching how <c>bfchar</c> destination strings are read.
+        /// </summary>
+        private static string BuildToUnicodeCMap(Dictionary<ushort, int> glyphs)
+        {
+            var sb = new StringBuilder();
+            sb.Append("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n");
+            sb.Append("/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n");
+            sb.Append("/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n");
+            sb.Append("1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n");
+
+            var ordered = glyphs.OrderBy(kv => kv.Key).ToList();
+            for (int i = 0; i < ordered.Count; i += 100)
+            {
+                var chunk = ordered.Skip(i).Take(100).ToList();
+                sb.Append(CultureInfo.InvariantCulture, $"{chunk.Count} beginbfchar\n");
+                foreach (var (gid, codepoint) in chunk)
+                    sb.Append(CultureInfo.InvariantCulture, $"<{gid:X4}> <{ToUnicodeHex(codepoint)}>\n");
+                sb.Append("endbfchar\n");
+            }
+
+            sb.Append("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
+            return sb.ToString();
+        }
+
+        /// <summary>Encodes a Unicode codepoint as a <c>bfchar</c> destination hex string (UTF-16BE).</summary>
+        private static string ToUnicodeHex(int codepoint)
+        {
+            if (codepoint <= 0xFFFF)
+                return codepoint.ToString("X4", CultureInfo.InvariantCulture);
+
+            string utf16 = char.ConvertFromUtf32(codepoint);
+            return ((int)utf16[0]).ToString("X4", CultureInfo.InvariantCulture) +
+                   ((int)utf16[1]).ToString("X4", CultureInfo.InvariantCulture);
         }
 
     // ==============================================================

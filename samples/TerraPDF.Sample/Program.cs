@@ -29,6 +29,10 @@ VectorGraphicsShowcase.Generate(Path.Combine(sampleDir, "10_vector_graphics_show
 UnicodeShowcase.Generate(Path.Combine(sampleDir, "11_unicode_showcase.pdf"));
 EncryptionShowcase.Generate(Path.Combine(sampleDir, "12_encryption_showcase.pdf"));
 BarcodesAndQrShowcase.Generate(Path.Combine(sampleDir, "13_barcodes_and_qr_showcase.pdf"));
+CustomFontShowcase.Generate(Path.Combine(sampleDir, "14_custom_font_showcase.pdf"),
+    Path.Combine(imgDir, "Fonts", "Lato-Regular.ttf"), Path.Combine(imgDir, "Fonts", "Lato-Bold.ttf"));
+ChildNutritionIndiaReport.Generate(Path.Combine(sampleDir, "15_child_nutrition_india_report.pdf"),
+    Path.Combine(imgDir, "Fonts", "NotoSansDevanagari-Regular.ttf"), Path.Combine(imgDir, "Fonts", "NotoSansDevanagari-Bold.ttf"));
 
 Console.WriteLine();
 Console.WriteLine("Done.");

@@ -55,10 +55,10 @@ Step  What to do
       - Add a fresh empty [Unreleased] section at the top
       - Update the comparison links at the bottom
 
- 3    Commit and push to main
+ 3    Commit and push to master
       git add .
       git commit -m "chore: release v1.3.0"
-      git push origin main
+      git push origin master
 
  4    Wait for CI to go green (build-and-test + pack dry-run must pass)
 
@@ -120,6 +120,8 @@ dotnet nuget remove source local-terra
 | `lib/net8.0/TerraPDF.xml` | IntelliSense XML doc comments |
 | `lib/net9.0/TerraPDF.dll` | Library assembly for .NET 9 |
 | `lib/net9.0/TerraPDF.xml` | IntelliSense XML doc comments |
+| `lib/net10.0/TerraPDF.dll` | Library assembly for .NET 10 |
+| `lib/net10.0/TerraPDF.xml` | IntelliSense XML doc comments |
 
 The `.snupkg` symbol package contains PDBs with Source Link data pointing to
 the exact commit on GitHub, enabling debugger step-in for consumers.

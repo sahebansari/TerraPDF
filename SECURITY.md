@@ -38,9 +38,9 @@ The following are **out of scope**:
 
 **Please do not file public GitHub Issues for security vulnerabilities.**
 
-Report security issues by emailing:
-
-> **security@terrapdf.example**
+Report security issues privately via
+[GitHub Security Advisories](https://github.com/sahebansari/TerraPDF/security/advisories/new)
+(repository **Security** tab → **Report a vulnerability**).
 
 Include in your report:
 

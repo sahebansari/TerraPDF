@@ -11,8 +11,13 @@
 [https://terrapdf.com/](https://terrapdf.com/)
 
 
-> **New in 1.5.0:** 
-Code128 barcodes and QR codes (ISO/IEC 18004, versions 1-40, all four error correction levels) via `container.Barcode(...)` and `container.QrCode(...)` — rendered as vector-filled rectangles, no raster image pipeline, placeable anywhere a `Column`, `Row`, or `Table` cell can go.
+> **New in 2.0.0:** Custom font embedding — `FontFamily.Register(...)` loads a TrueType font
+(brand typefaces, or scripts beyond WinAnsiEncoding like Cyrillic and Greek) and uses it via the
+same `TextStyle.FontFamily(...)` API as the built-in families — including automatic, pure-C#
+Devanagari-aware rendering (conjunct ligatures, reph, and below-base 'ra' forms, no native
+shaping engine). See [Custom Fonts](docs/custom-fonts.md).
+>
+> Also: Code128 barcodes and QR codes (ISO/IEC 18004, versions 1-40, all four error correction levels) via `container.Barcode(...)` and `container.QrCode(...)` — rendered as vector-filled rectangles, no raster image pipeline, placeable anywhere a `Column`, `Row`, or `Table` cell can go. TerraPDF also multi-targets **.NET 10 (LTS)** alongside .NET 8 and 9.
 
 **TerraPDF** is a lightweight, zero-dependency, pure C# library for generating professional PDF 1.7 documents programmatically.
 It provides a fluent, composable API that covers the full document-authoring lifecycle — from page layout and
@@ -28,7 +33,7 @@ runtime packages, and no licensing restrictions.
 - **Cross-platform** — runs anywhere .NET runs: Windows, Linux, macOS, Docker containers, Azure Functions, AWS Lambda, ASP.NET Core web apps, console apps, and background services.
 - **Modern .NET** — targets .NET 8 (LTS), .NET 9, and .NET 10 (LTS).
 - **Code-first, not HTML-to-PDF** — documents are composed from typed C# layout primitives (`Column`, `Row`, `Table`), so output is deterministic and fast — no browser engine to install or babysit.
-- **Batteries included** — text styling, tables, images, hyperlinks, bookmarks, table of contents, headers/footers, page numbers, vector graphics, Code128 barcodes, QR codes, and AES-256 encryption.
+- **Batteries included** — text styling, tables, images, hyperlinks, bookmarks, table of contents, headers/footers, page numbers, vector graphics, Code128 barcodes, QR codes, custom embedded fonts, and AES-256 encryption.
 
 ## Common use cases
 
@@ -71,6 +76,7 @@ runtime packages, and no licensing restrictions.
  - **Vector graphics canvas** — lines, rectangles, rounded rectangles, circles, ellipses, arbitrary Bézier paths, polygons, and grid helpers via `container.Canvas()`
  - **Code128 barcodes** — `container.Barcode(...)`, with optional human-readable caption, custom colours, and quiet zone
  - **QR codes** — `container.QrCode(...)`, full ISO/IEC 18004 generator (versions 1-40, error correction levels L/M/Q/H), rendered as vector rectangles
+ - **Custom font embedding** — `FontFamily.Register(...)` embeds a TrueType font (brand typefaces, Cyrillic, Greek, and beyond WinAnsiEncoding) used via the same `FontFamily()` API as the built-in families
  - Fluent, composable API
 
 ---
@@ -144,6 +150,7 @@ For complete API reference and detailed guides, visit the [docs](https://github.
 - **[Page Sizes & Units](https://github.com/sahebansari/TerraPDF/blob/master/docs/page-sizes-and-units.md)** — Built-in page sizes and unit conversions
 - **[Colors](https://github.com/sahebansari/TerraPDF/blob/master/docs/colors.md)** — Material Design color palette with shades
 - **[Encryption & Security](https://github.com/sahebansari/TerraPDF/blob/master/docs/encryption.md)** — AES-256 by default, with AES-128 compatibility mode and permission flags
+- **[Custom Fonts](https://github.com/sahebansari/TerraPDF/blob/master/docs/custom-fonts.md)** — embed TrueType fonts for brand typefaces and full Unicode (Cyrillic, Greek, and beyond)
 - **[Vector Graphics](https://github.com/sahebansari/TerraPDF/blob/master/docs/vector-graphics.md)** — Canvas API, shapes, paths, grids, and charts
 - **[Table of Contents](https://github.com/sahebansari/TerraPDF/blob/master/docs/table-of-contents.md)** — Automatic TOC generation from headings
 - **[Bookmarks](https://github.com/sahebansari/TerraPDF/blob/master/docs/bookmarks.md)** — PDF bookmarks and outlines

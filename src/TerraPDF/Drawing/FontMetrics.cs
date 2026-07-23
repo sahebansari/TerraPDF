@@ -372,4 +372,14 @@ internal static class FontMetrics
         }
         return total;
     }
+
+    /// <summary>
+    /// Total advance width of <paramref name="text"/> in PDF points for a resolved font —
+    /// dispatches to the standard-14 AFM tables or a custom TrueType variant's own
+    /// <c>hmtx</c> widths, whichever <paramref name="font"/> carries.
+    /// </summary>
+    internal static double MeasureWidth(string text, double fontSize, ResolvedFont font, bool bold, bool italic) =>
+        font.IsCustom
+            ? font.Custom!.MeasureWidth(text, fontSize)
+            : MeasureWidth(text, fontSize, font.StandardFamily, bold, italic);
 }

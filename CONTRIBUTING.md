@@ -31,8 +31,8 @@ discrimination in any form.
 
 ### Prerequisites
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download) or later (the library
-  targets both .NET 8 and .NET 9)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download) (needed to build all
+  targets; the library multi-targets .NET 8, .NET 9, and .NET 10)
 - Git
 
 ### Clone and Build
@@ -125,6 +125,10 @@ Tests live in `tests/TerraPDF.Tests/` and use **xUnit**.
 | `HighPriorityFeatureTests.cs` | Integration — underline, line-height, hyperlink, per-edge borders |
 | `RoundedBorderTests.cs` | Unit/Integration — `RoundedBorder` and `RoundedBox` geometry and validation |
 | `PageBreakTests.cs` | Integration — explicit page-break positioning |
+| `FontEmbeddingTests.cs` | Unit/Integration — TrueType parsing, `FontFamily` registration/fallback, and the embedded-font PDF object graph |
+| `DevanagariReorderingTests.cs` | Unit/Integration — ि matra and reph (र्) codepoint reordering for custom Devanagari fonts |
+| `DevanagariConjunctsTests.cs` | Unit/Integration — GSUB-driven conjunct ligature substitution (`half`/`akhn`/`cjct`/`rphf`/`rkrf`) |
+| `WordBreakTests.cs` | Integration — character-boundary breaking of a single word wider than the available line width |
 | `HeaderFirstPageOnlyTests.cs` | Integration — conditional first-page-only header rendering |
 
 ### Running with coverage

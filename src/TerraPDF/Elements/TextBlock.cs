@@ -98,10 +98,13 @@ internal sealed class TextBlock : Element
         }
     }
 
-    private static double TokenWidth(in TextToken t) =>
-        FontMetrics.MeasureWidth(t.Text, t.Style.Size ?? 12,
-            PdfFonts.Resolve(t.Style.Family),
-            t.Style.IsBold ?? false, t.Style.IsItalic ?? false);
+    private static double TokenWidth(in TextToken t)
+    {
+        bool bold = t.Style.IsBold ?? false;
+        bool italic = t.Style.IsItalic ?? false;
+        var font = PdfFonts.ResolveFont(t.Style.Family, bold, italic);
+        return FontMetrics.MeasureWidth(t.Text, t.Style.Size ?? 12, font, bold, italic);
+    }
 
     // -- Line building -----------------------------------------------------
 
@@ -110,7 +113,8 @@ internal sealed class TextBlock : Element
 
     /// <summary>
     /// Greedily packs tokens into lines no wider than <paramref name="availableWidth"/>.
-    /// Returns at least one (possibly empty) line.
+    /// A single word wider than the line is broken at character boundaries so no
+    /// line ever exceeds the available width. Returns at least one (possibly empty) line.
     /// </summary>
     private static List<WrappedLine> BuildLines(List<TextToken> tokens, double availableWidth)
     {
@@ -135,7 +139,7 @@ internal sealed class TextBlock : Element
 
             double tw = TokenWidth(token);
 
-            // Token overflows – wrap unless it is the only token on the line (very long word)
+            // Token overflows the current line – wrap first
             if (lineW + tw > availableWidth && current.Count > 0)
             {
                 lines.Add(new WrappedLine(TrimTrailing(current), IsLastInParagraph: false));
@@ -147,7 +151,22 @@ internal sealed class TextBlock : Element
                     continue;
             }
 
-            current.Add(token);
+            // The token now starts its line. If it alone is wider than the line,
+            // break it at character boundaries; the last fragment stays in
+            // `current` so following tokens can pack after it. Page-number
+            // tokens are exempt: their text is a placeholder substituted at
+            // draw time, so each fragment would redraw the full number.
+            var placed = token;
+            if (tw > availableWidth && !token.IsPageNumber && !token.IsTotalPages)
+            {
+                var fragments = BreakOversizedToken(token, availableWidth);
+                for (int f = 0; f < fragments.Count - 1; f++)
+                    lines.Add(new WrappedLine([fragments[f]], IsLastInParagraph: false));
+                placed = fragments[^1];
+                tw     = TokenWidth(placed);
+            }
+
+            current.Add(placed);
             lineW += tw;
         }
 
@@ -155,6 +174,38 @@ internal sealed class TextBlock : Element
             lines.Add(new WrappedLine(TrimTrailing(current), IsLastInParagraph: true));
 
         return lines.Count > 0 ? lines : [new WrappedLine([], true)];
+    }
+
+    /// <summary>
+    /// Splits a token wider than <paramref name="availableWidth"/> into fragments
+    /// that each fit, keeping surrogate pairs intact. Character advance widths are
+    /// additive (<see cref="FontMetrics.MeasureWidth(string, double, PdfFontFamily, bool, bool)"/> applies no kerning), so a
+    /// fragment's width equals the sum of its characters'. Every fragment carries
+    /// at least one character so layout always makes progress, even when the line
+    /// is narrower than a single glyph.
+    /// </summary>
+    private static List<TextToken> BreakOversizedToken(in TextToken token, double availableWidth)
+    {
+        var fragments = new List<TextToken>();
+        string text = token.Text;
+        int start = 0;
+        while (start < text.Length)
+        {
+            double w   = 0;
+            int    end = start;
+            while (end < text.Length)
+            {
+                int next = end + (char.IsHighSurrogate(text[end]) && end + 1 < text.Length ? 2 : 1);
+                double cw = TokenWidth(token with { Text = text[end..next] });
+                if (end > start && w + cw > availableWidth)
+                    break;
+                w   += cw;
+                end  = next;
+            }
+            fragments.Add(token with { Text = text[start..end] });
+            start = end;
+        }
+        return fragments;
     }
 
     private static List<TextToken> TrimTrailing(List<TextToken> line)
@@ -214,12 +265,15 @@ internal sealed class TextBlock : Element
         bool   sb  = token.Style.IsBold  ?? false;
         bool   si  = token.Style.IsItalic ?? false;
         var    sc  = PdfColor.FromHex(sh);
-        var    fam = PdfFonts.Resolve(token.Style.Family);
+        var    font = PdfFonts.ResolveFont(token.Style.Family, sb, si);
 
         double bl = lineY + sf;
-        double tw = FontMetrics.MeasureWidth(token.Text, sf, fam, sb, si);
+        double tw = FontMetrics.MeasureWidth(token.Text, sf, font, sb, si);
 
-        ctx.Page.ShowTextAt(token.Text, x, bl, sf, sc, fam, sb, si);
+        if (font.IsCustom)
+            ctx.Page.ShowTextAtCustomFont(token.Text, x, bl, sf, sc, font.Custom!);
+        else
+            ctx.Page.ShowTextAt(token.Text, x, bl, sf, sc, font.StandardFamily, sb, si);
 
         if (token.Style.IsStrikethrough ?? false)
             decorations.Add(new DecorationStroke(x, bl - sf * 0.35, tw, sc, sf * 0.07));

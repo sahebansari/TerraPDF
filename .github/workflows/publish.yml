@@ -11,7 +11,7 @@
 # How to release (full checklist):
 #   1. Bump <Version> in src/TerraPDF/TerraPDF.csproj        (e.g. 1.2.0)
 #   2. Update CHANGELOG.md - move [Unreleased] items to [1.2.0] section
-#   3. Commit everything and push to main
+#   3. Commit everything and push to master
 #   4. On GitHub: Releases -> Draft a new release
 #      - Set tag to match the version, e.g.  v1.2.0
 #      - Copy the CHANGELOG section as release notes

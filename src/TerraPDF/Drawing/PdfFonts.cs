@@ -1,3 +1,5 @@
+using TerraPDF.Drawing.TrueType;
+
 namespace TerraPDF.Drawing;
 
 /// <summary>The three standard-14 text font families available without embedding.</summary>
@@ -6,6 +8,26 @@ internal enum PdfFontFamily
     Helvetica,
     Times,
     Courier,
+}
+
+/// <summary>
+/// A font resolved for a piece of text: either one of the three standard-14 families
+/// (no embedding, <see cref="StandardFamily"/> valid) or a registered custom TrueType
+/// variant (embedded per-document, <see cref="Custom"/> valid). Keeping both behind one
+/// type lets <see cref="Elements.TextBlock"/> and <see cref="PdfPage"/> carry a single
+/// value through measurement and drawing without a second call path for every site.
+/// </summary>
+internal readonly struct ResolvedFont
+{
+    internal bool IsCustom { get; private init; }
+    internal PdfFontFamily StandardFamily { get; private init; }
+    internal CustomFontVariant? Custom { get; private init; }
+
+    internal static ResolvedFont Standard(PdfFontFamily family) =>
+        new() { IsCustom = false, StandardFamily = family };
+
+    internal static ResolvedFont FromCustom(CustomFontVariant variant) =>
+        new() { IsCustom = true, Custom = variant };
 }
 
 /// <summary>
@@ -59,5 +81,21 @@ internal static class PdfFonts
         if (f.StartsWith("Courier", StringComparison.OrdinalIgnoreCase))
             return PdfFontFamily.Courier;
         return PdfFontFamily.Helvetica;
+    }
+
+    /// <summary>
+    /// Resolves a user-supplied family name and weight/slant to the font that should
+    /// actually render the text: a registered custom TrueType variant when
+    /// <paramref name="family"/> matches one (see <see cref="Helpers.FontFamily.Register(string, string, bool, bool)"/>),
+    /// otherwise the same standard-14 resolution as <see cref="Resolve(string?)"/>.
+    /// </summary>
+    internal static ResolvedFont ResolveFont(string? family, bool bold, bool italic)
+    {
+        if (!string.IsNullOrWhiteSpace(family) &&
+            CustomFontRegistry.TryGet(family, bold, italic, out var variant))
+        {
+            return ResolvedFont.FromCustom(variant!);
+        }
+        return ResolvedFont.Standard(Resolve(family));
     }
 }
