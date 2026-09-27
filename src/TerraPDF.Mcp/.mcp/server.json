@@ -2,12 +2,12 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "description": "Create PDF files from a validated JSON document, and look up the verified TerraPDF C# API while writing code.",
   "name": "io.github.sahebansari/terrapdf",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "packages": [
     {
       "registryType": "nuget",
       "identifier": "TerraPDF.Mcp",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "transport": {
         "type": "stdio"
       },

@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [2.4.0] - 2026-09-27
+
+A performance release: 2–30× faster rendering and 60–95% fewer allocations in
+realistic workloads. Output is byte-identical except for the text-run, PNG
+passthrough and font-width changes noted below.
+
 ### Performance
 - PNG images are no longer decoded when composed: only the header is read, and
   pixels are decoded once per distinct image when the document is saved. Placing
@@ -53,10 +61,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Content-stream numbers (`F2`/`F4` coordinates and colours) are written by a
   fixed-point formatter instead of the general floating-point one, with
   byte-identical output: vector-heavy pages are ~35% faster.
-- PNG images with an alpha channel are converted (decoded and compressed) once
-  per process: the resulting streams are kept in a bounded (32 MB) process-wide
-  cache keyed by the file's SHA-256, so a logo rendered into every document is
-  no longer decoded again for each one. Output is identical.
+- PNG images are converted once per process: the resulting streams are kept in
+  a bounded (32 MB) process-wide cache keyed by the file's SHA-256, so a logo
+  rendered into every document is no longer decoded (alpha PNGs) or checked and
+  copied (RGB and palette PNGs) again for each one. Output is identical.
 - Large documents (8 pages or more and at least 512 K characters of content)
   compress their page content streams in parallel. Output is identical.
 - New BenchmarkDotNet suite in `benchmarks/TerraPDF.Benchmarks`, and a throughput
@@ -80,30 +88,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   words after them no longer overlap.
 - Line wrapping and alignment can change slightly for text containing the
   characters above, because they are now measured at their real width.
+- A truncated or corrupt RGB or palette PNG is reported again
+  (`InvalidDataException`) instead of being embedded as data the PDF viewer
+  cannot render. Such PNGs are embedded without decoding only once their data
+  is known to decompress to the full image; anything else goes through the
+  decoder, as before. PNG sizes of 2³¹ pixels or more are rejected.
+- `Image(byte[])` keeps its own copy of the image bytes, so reusing or
+  refilling the buffer before the document is saved no longer changes the
+  image. Passing the same unchanged buffer again reuses the copy, so a logo
+  placed on every page is still copied once.
 
+### Changed
+- Errors in PNG pixel data (as opposed to its header) are now raised when the
+  document is saved (`PublishPdf`, `GeneratePdf`) instead of by `Image(...)`.
 
----
-
-## [Unreleased]
-
-### Performance
-- PNG images are no longer decoded when composed: only the header is read, and
-  pixels are decoded once per distinct image when the document is saved. Placing
-  the same PNG 40 times is ~20× faster and allocates ~40× less. Deduplication now
-  keys on the original file bytes instead of hashing decoded pixels.
-  `VectorCanvas.GetImageSizeInPoints` no longer decodes the image either.
-- Documents without page-number spans are no longer laid out a second time when
-  their page count has a different digit count from the initial estimate (99),
-  e.g. every 1–9 page document.
-- Text layout computes each word's width, font, and colour once instead of 4–5
-  times, and memoises wrapped lines and table row heights for the duration of a
-  publish. Text-heavy documents are ~2× faster with about half the allocations.
-- Drawing a page slice of a split table only visits that slice's cells instead
-  of scanning the whole table.
-- Content-stream numbers and escaped text are written straight into the page
-  buffer without temporary strings.
-- New BenchmarkDotNet suite in `benchmarks/TerraPDF.Benchmarks` (see
-  `docs/benchmarks.md`).
+### Agent packages
+- **TerraPDF.Agents 1.0.1** and **TerraPDF.Mcp 1.0.1** build on TerraPDF 2.4.0.
+- `create_pdf` and `PdfSpecRenderer` return a malformed PNG as an error the
+  model can act on ("TerraPDF could not render the document: …") instead of
+  throwing `InvalidDataException`.
 
 ---
 
@@ -807,7 +810,8 @@ happened to fall inside a spanned pair.
 - CI workflow (GitHub Actions): build, test, coverage.
 - Publish workflow (GitHub Actions): NuGet + symbols on release tag.
 
-[Unreleased]: https://github.com/sahebansari/TerraPDF/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/sahebansari/TerraPDF/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/sahebansari/TerraPDF/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/sahebansari/TerraPDF/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/sahebansari/TerraPDF/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/sahebansari/TerraPDF/compare/v2.0.1...v2.1.0
