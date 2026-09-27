@@ -42,6 +42,7 @@ runtime packages.
 - **Cross-platform** — runs anywhere .NET runs: Windows, Linux, macOS, Docker containers, Azure Functions, AWS Lambda, ASP.NET Core web apps, console apps, and background services.
 - **Modern .NET** — targets .NET 8 (LTS), .NET 9, and .NET 10 (LTS).
 - **Code-first, not HTML-to-PDF** — documents are composed from typed C# layout primitives (`Column`, `Row`, `Table`), so output is deterministic and fast — no browser engine to install or babysit.
+- **High throughput, low memory** — in a 2-CPU / 1 GB container, one-page invoices render at about 10,000 pages per second and a 19-page report at about 25,000. Layout results are reused within each render, and images are converted once per process. See [Benchmarks](https://github.com/sahebansari/TerraPDF/blob/master/docs/benchmarks.md).
 - **Batteries included** — text styling, tables, images, hyperlinks, bookmarks, table of contents, headers/footers, page numbers, vector graphics, Code128 barcodes, QR codes, custom embedded fonts, and AES-256 encryption.
 
 ## Common use cases
@@ -187,6 +188,7 @@ For complete API reference and detailed guides, visit the [docs](https://github.
 - **[Metadata](https://github.com/sahebansari/TerraPDF/blob/master/docs/metadata.md)** — Document metadata (Title, Author, Subject, Keywords, Creator)
 - **[Unicode & Character Encoding](https://github.com/sahebansari/TerraPDF/blob/master/docs/unicode-and-encoding.md)** — WinAnsiEncoding and character coverage
 - **[AI Agents](https://github.com/sahebansari/TerraPDF/blob/master/docs/ai-agents.md)** — Skill for coding assistants, agent tools, and MCP server
+- **[Benchmarks](https://github.com/sahebansari/TerraPDF/blob/master/docs/benchmarks.md)** — Running the BenchmarkDotNet suite and the throughput harness, and reading the results
 - **[Samples](https://github.com/sahebansari/TerraPDF/tree/master/samples)** — Complete working examples demonstrating all features
 
 ---
@@ -215,12 +217,15 @@ Yes. Documents can be encrypted with AES-256 (default) or AES-128, with user/own
 ```sh
 git clone https://github.com/sahebansari/TerraPDF.git
 cd TerraPDF
-dotnet build
-dotnet test
+dotnet build -c Release
+./tests/TerraPDF.Tests/bin/Release/net10.0/TerraPDF.Tests
+./tests/TerraPDF.Agents.Tests/bin/Release/net10.0/TerraPDF.Agents.Tests
 ```
 
 Requires the **.NET 10 SDK** (builds all targets), plus the .NET 8 and .NET 9
-runtimes to execute the full multi-framework test suite.
+runtimes to execute the full multi-framework test suite. The tests are xUnit v3
+executables: run them directly (add `.exe` on Windows, and swap `net10.0` for
+`net8.0` or `net9.0`), because `dotnet test` cannot drive them on the .NET 10 SDK.
 
 ---
 

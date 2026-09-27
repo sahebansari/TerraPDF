@@ -81,6 +81,44 @@ public class SpecRenderingTests
     }
 
     [Fact]
+    public void MalformedPngIsReportedAsAnErrorNotThrown()
+    {
+        // Valid signature and header, so it passes validation, but the pixel data is a row short.
+        string json = $$"""
+            { "content": [ { "type": "image", "source": "data:image/png;base64,{{Convert.ToBase64String(TruncatedRgbPng())}}" } ] }
+            """;
+
+        PdfRenderResult result = Render(json);
+
+        Assert.False(result.Success);
+        SpecIssue error = Assert.Single(result.Errors);
+        Assert.Contains("could not render", error.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>A 2×2 RGB PNG whose IDAT stream only holds the first row.</summary>
+    private static byte[] TruncatedRgbPng()
+    {
+        byte[] firstRow = [0, 255, 0, 0, 0, 255, 0];      // filter None + two RGB pixels
+        using var idat = new MemoryStream();
+        using (var z = new System.IO.Compression.ZLibStream(idat, System.IO.Compression.CompressionLevel.Fastest, leaveOpen: true))
+            z.Write(firstRow);
+
+        using var png = new MemoryStream();
+        png.Write([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        void Chunk(string type, byte[] data)
+        {
+            png.Write([(byte)(data.Length >> 24), (byte)(data.Length >> 16), (byte)(data.Length >> 8), (byte)data.Length]);
+            png.Write(Encoding.ASCII.GetBytes(type));
+            png.Write(data);
+            png.Write([0, 0, 0, 0]); // CRC, not verified
+        }
+        Chunk("IHDR", [0, 0, 0, 2, 0, 0, 0, 2, 8, 2, 0, 0, 0]); // 2×2, 8-bit RGB
+        Chunk("IDAT", idat.ToArray());
+        Chunk("IEND", []);
+        return png.ToArray();
+    }
+
+    [Fact]
     public void LongTablePaginates()
     {
         string rows = string.Join(",", Enumerable.Range(1, 200).Select(i => $"[\"Item {i}\", {i}]"));

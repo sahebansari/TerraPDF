@@ -51,6 +51,7 @@
 | TOC or bookmark page numbers off by the TOC page | Manual `doc.Bookmark(title, page)` numbers are absolute, 1-based | Prefer anchored `container.Bookmark("Title")`, which resolves automatically |
 | `InvalidOperationException` at `PublishPdf` mentioning a page | A canvas `InternalLink` targets a page beyond the document's last page | Use a page number that exists (1-based, physical pages including a TOC page) **[2.3+]** |
 | `NotSupportedException` from `canvas.QrCode` | Data too long for any QR version at that level; thrown at the call, not at render | Shorten it or lower the level **[2.3+]** |
+| `InvalidDataException` at `PublishPdf` | A PNG is truncated or corrupt. From 2.4.0 its pixel data is read when the document is saved, so the error surfaces there rather than at `Image(...)` | Re-export the PNG, or check it opens in an image viewer before adding it |
 | A canvas bookmark appears once although the canvas repeats on every page | A repeated (title, parent) pair is recorded once by design | Include something unique, such as the page, in the title **[2.3+]** |
 | `CS1061` for `Link`, `QrCode`, `Bookmark` on `VectorCanvas`, or `FillLinearGradient`/`Dash`/`RoundedRect` on `PathDescriptor` | The project references TerraPDF older than 2.3.0; these are **[2.3+]** members | Upgrade TerraPDF, or use the layout-level `Hyperlink`, `QrCode`, and `Bookmark` decorators |
 | Image stretched across the page | `Image(path)` fills the available width | `Image(path, widthPt)`, wrapped in `AlignCenter()` or `AlignRight()` to position it |

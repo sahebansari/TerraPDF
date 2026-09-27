@@ -527,7 +527,8 @@ public static class ContainerExtensions
         ArgumentNullException.ThrowIfNull(imageData);
         if (imageData.Length == 0)
             throw new ArgumentException("Image data must not be empty.", nameof(imageData));
-        container.Slot().Child = new ImageElement(imageData);
+        // Copied: the image is read when the document is saved, and the caller may reuse the buffer.
+        container.Slot().Child = new ImageElement(Drawing.ImageSource.Snapshot(imageData));
         return container;
     }
 
@@ -544,7 +545,8 @@ public static class ContainerExtensions
         if (imageData.Length == 0)
             throw new ArgumentException("Image data must not be empty.", nameof(imageData));
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
-        container.Slot().Child = new ImageElement(imageData, width);
+        // Copied: the image is read when the document is saved, and the caller may reuse the buffer.
+        container.Slot().Child = new ImageElement(Drawing.ImageSource.Snapshot(imageData), width);
         return container;
     }
 

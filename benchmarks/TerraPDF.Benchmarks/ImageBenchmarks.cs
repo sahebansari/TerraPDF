@@ -10,6 +10,7 @@ public class ImageBenchmarks : PdfBenchmarkBase
     private byte[] _png = [];
     private string _pngKey = "";
     private byte[] _rgbPng = [];
+    private string _rgbPngKey = "";
     private byte[] _alphaPng = [];
     private byte[] _jpg = [];
 
@@ -23,6 +24,7 @@ public class ImageBenchmarks : PdfBenchmarkBase
         _png = Assets.HeaderLogoPng();
         _pngKey = ImageSource.FromBytes(_png).ContentKey;
         _rgbPng = Assets.HeaderLogoRgbPng();
+        _rgbPngKey = ImageSource.FromBytes(_rgbPng).ContentKey;
         _alphaPng = Assets.AlphaBadgePng();
         _jpg = Assets.SmallLogoJpg();
     }
@@ -57,6 +59,14 @@ public class ImageBenchmarks : PdfBenchmarkBase
     /// <summary>Opaque RGB PNG: embedded still compressed, no decode.</summary>
     [Benchmark]
     public long RgbPngDocument() => Publish(Docs.Images(_rgbPng, Count));
+
+    /// <summary>Same document, but the RGB PNG's data is checked again (first document of the process).</summary>
+    [Benchmark]
+    public long RgbPngDocumentColdCache()
+    {
+        EncodedImageCache.Remove(_rgbPngKey);
+        return Publish(Docs.Images(_rgbPng, Count));
+    }
 
     [Benchmark]
     public long AlphaPngDocument() => Publish(Docs.Images(_alphaPng, Count));

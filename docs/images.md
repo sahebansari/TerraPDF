@@ -48,6 +48,13 @@ Identical image data used on multiple pages (for example a logo in a repeated
 header) is embedded **once** and shared document-wide — file size does not grow
 with the page count.
 
+From 2.4.0, PNG pixels are read when the document is saved, once per distinct
+image, and the converted image is kept in a bounded (32 MB) process-wide cache,
+so a service that puts the same logo in every document converts it once.
+`Image(byte[])` keeps its own copy of the bytes, so the buffer can be reused
+straight away. A truncated or corrupt PNG therefore raises
+`InvalidDataException` from `PublishPdf`, not from `Image`.
+
 ### Fixed width
 
 Constrains the image to a specific width in PDF points. Height is still computed

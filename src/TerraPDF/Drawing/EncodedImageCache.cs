@@ -11,6 +11,10 @@ namespace TerraPDF.Drawing;
 /// (which is applied per object afterwards), and compression is deterministic, so a cached
 /// entry yields exactly the bytes a fresh conversion would.
 /// <para>
+/// RGB and palette PNGs are cached too, in their original compressed form: their data is
+/// checked once (see <see cref="PngDecoder.TryReadPassthrough"/>) and not per document.
+/// </para>
+/// <para>
 /// Bounded by <see cref="MaxBytes"/> of cached stream data; the least recently used entries
 /// are evicted first. Images larger than a quarter of the budget are never cached.
 /// </para>
@@ -20,10 +24,16 @@ internal static class EncodedImageCache
     /// <summary>Upper bound on the total size of cached streams.</summary>
     internal const long MaxBytes = 32L * 1024 * 1024;
 
-    /// <summary>A PNG converted for embedding: compressed RGB samples and, when transparent, compressed alpha.</summary>
-    internal sealed record Entry(byte[] CompressedRgb, byte[]? CompressedAlpha)
+    /// <summary>
+    /// A PNG converted for embedding: compressed RGB samples and, when transparent, compressed
+    /// alpha. When <paramref name="IsPngPredicted"/> is set, <paramref name="CompressedRgb"/> is
+    /// instead the PNG's own zlib stream, still carrying its row filters (<c>/Predictor 15</c>),
+    /// with the lookup table in <paramref name="Palette"/> for an indexed PNG.
+    /// </summary>
+    internal sealed record Entry(byte[] CompressedRgb, byte[]? CompressedAlpha,
+        bool IsPngPredicted = false, byte[]? Palette = null)
     {
-        internal long Size => CompressedRgb.Length + (CompressedAlpha?.Length ?? 0);
+        internal long Size => CompressedRgb.Length + (CompressedAlpha?.Length ?? 0) + (Palette?.Length ?? 0);
     }
 
     private static readonly object Gate = new();

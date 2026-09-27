@@ -50,7 +50,7 @@ internal static class PngDecoder
                 imgWidth  = ReadBigEndianInt32(png, data);
                 imgHeight = ReadBigEndianInt32(png, data + 4);
                 colorType = png[data + 9];
-                ValidateHeader(bitDepth: png[data + 8], colorType, interlace: png[data + 12]);
+                ValidateHeader(imgWidth, imgHeight, bitDepth: png[data + 8], colorType, interlace: png[data + 12]);
             }
             else if (type.SequenceEqual("PLTE"u8))
             {
@@ -116,7 +116,7 @@ internal static class PngDecoder
         var ihdr = png.Slice(16, 13);
         int width = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(ihdr);
         int height = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(ihdr[4..]);
-        ValidateHeader(bitDepth: ihdr[8], colorType: ihdr[9], interlace: ihdr[12]);
+        ValidateHeader(width, height, bitDepth: ihdr[8], colorType: ihdr[9], interlace: ihdr[12]);
         return (width, height);
     }
 
@@ -132,7 +132,8 @@ internal static class PngDecoder
     /// Extracts the compressed image data for embedding without decoding, or returns
     /// <see langword="null"/> when the PNG needs decoding: colour types with an alpha
     /// channel (4, 6) must be split into colour and a /SMask, and a palette PNG without
-    /// a valid PLTE chunk is left to <see cref="Decode"/>.
+    /// a valid PLTE chunk is left to <see cref="Decode"/>, and so is data that does not
+    /// inflate to the full image, so malformed files are reported exactly as before.
     /// Chunk CRCs are not verified, matching <see cref="Decode"/>.
     /// </summary>
     internal static Passthrough? TryReadPassthrough(byte[] png)
@@ -163,6 +164,12 @@ internal static class PngDecoder
         if (colorType == 3 && (palette is null || palette.Length == 0 || palette.Length % 3 != 0 || palette.Length > 256 * 3))
             return null;
 
+        // The viewer is trusted with the data only once it is known to inflate to the full
+        // image with valid row filters; anything else goes through Decode, which reports it.
+        long stride = (long)width * BytesPerPixel(colorType) + 1;
+        if (!InflatesToImage(png, idat, stride, height))
+            return null;
+
         var zlib = new byte[total];
         int at = 0;
         foreach (var (offset, length) in idat)
@@ -173,8 +180,46 @@ internal static class PngDecoder
         return new Passthrough(width, height, colorType, palette, zlib);
     }
 
-    private static void ValidateHeader(int bitDepth, int colorType, int interlace)
+    /// <summary>
+    /// True when the IDAT stream inflates to at least <paramref name="stride"/> ×
+    /// <paramref name="height"/> bytes and every row starts with a valid filter type (0–4).
+    /// Inflates through a pooled buffer without keeping the pixels, and stops at the
+    /// declared size, as <see cref="Decode"/> does.
+    /// </summary>
+    private static bool InflatesToImage(byte[] png, List<(int Offset, int Length)> idat, long stride, int height)
     {
+        long expected = stride * height;
+        byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(64 * 1024);
+        try
+        {
+            using var zlib = new ZLibStream(new ChunkStream(png, idat), CompressionMode.Decompress);
+            long read = 0, nextRow = 0;
+            while (read < expected)
+            {
+                int n = zlib.Read(buffer, 0, (int)Math.Min(buffer.Length, expected - read));
+                if (n == 0) return false; // shorter than the declared size
+                for (; nextRow < read + n; nextRow += stride)
+                    if (buffer[nextRow - read] > 4) return false;
+                read += n;
+            }
+            return true;
+        }
+        catch (InvalidDataException)
+        {
+            return false; // corrupt deflate data
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    private static void ValidateHeader(int width, int height, int bitDepth, int colorType, int interlace)
+    {
+        // PNG allows at most 2^31-1; a larger value reads as negative. (Zero-size images
+        // are tolerated: layout skips them.)
+        if (width < 0 || height < 0)
+            throw new InvalidDataException($"PNG dimensions {width}x{height} are invalid.");
         if (bitDepth != 8)
             throw new NotSupportedException(
                 $"PNG bit depth {bitDepth} is not supported; only 8-bit PNGs are accepted.");

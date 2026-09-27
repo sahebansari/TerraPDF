@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 
 namespace TerraPDF.Drawing;
@@ -55,6 +56,24 @@ internal sealed class ImageSource
         throw new NotSupportedException(
             "Image data is not a recognised PNG or JPEG (checked by magic bytes). " +
             "Only PNG and JPEG images are supported.");
+    }
+
+    // Caller buffer → our copy of it, held only while the caller's array is alive.
+    private static readonly ConditionalWeakTable<byte[], byte[]> Snapshots = new();
+
+    /// <summary>
+    /// A private copy of caller-supplied image bytes, which are only read when the document
+    /// is saved. The same buffer passed again with unchanged content (a logo placed on every
+    /// page or in every document) reuses its copy, so repeated placements allocate nothing.
+    /// </summary>
+    internal static byte[] Snapshot(byte[] data)
+    {
+        if (Snapshots.TryGetValue(data, out var copy) && copy.AsSpan().SequenceEqual(data))
+            return copy;
+
+        copy = data.ToArray();
+        Snapshots.AddOrUpdate(data, copy);
+        return copy;
     }
 
     internal static bool IsPngData(byte[] d) =>

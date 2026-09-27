@@ -97,8 +97,9 @@ public sealed class PdfSpecRenderer
             byte[] pdf = Document.Create(doc => ComposeDocument(doc, spec, context)).PublishPdf();
             return new PdfRenderResult { Pdf = pdf, PageCount = CountPages(pdf), Warnings = validator.Warnings };
         }
+        // InvalidDataException (a malformed PNG, found when the document is saved) is not an IOException.
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or InvalidOperationException
-                                       or FormatException or IOException)
+                                       or FormatException or IOException or InvalidDataException)
         {
             // Validation catches the common cases; anything TerraPDF still rejects
             // goes back to the model as an error it can act on, never as a crash.

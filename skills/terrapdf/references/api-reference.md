@@ -1,6 +1,6 @@
 # TerraPDF API reference
 
-Every public member of TerraPDF 2.3.0 that application code uses. If a member
+Every public member of TerraPDF 2.4.0 that application code uses. If a member
 is not listed here, it does not exist. Do not guess.
 
 Members marked **[2.3+]** were added in 2.3.0. If the project references an
@@ -9,7 +9,7 @@ older TerraPDF, they do not compile: upgrade the package or avoid them.
 ## Package and namespaces
 
 ```bash
-dotnet add package TerraPDF --version 2.3.0
+dotnet add package TerraPDF --version 2.4.0
 ```
 
 Targets `net8.0`, `net9.0`, and `net10.0`. Zero dependencies, no native

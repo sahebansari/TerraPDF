@@ -16,7 +16,7 @@
 
     <!-- NuGet package identity and discoverability -->
     <PackageId>TerraPDF</PackageId>
-    <Version>2.3.0</Version>
+    <Version>2.4.0</Version>
     <Authors>Saheb Ansari</Authors>
     <Copyright>Copyright © 2025-2026 TerraPDF Contributors</Copyright>
     <Title>TerraPDF - Free C# PDF Library for .NET</Title>
@@ -39,7 +39,7 @@
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageProjectUrl>https://github.com/sahebansari/TerraPDF</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>Version 2.3.0 adds linear and radial gradient fills, dashed strokes on ellipses, rounded rectangles, pie sectors, and arbitrary paths, rounded-rectangle paths, and clickable links, in-document links, bookmarks, and vector QR codes placed at canvas positions. It fixes VectorCanvas.Grid() drawing nothing and ShowIf(false) not hiding chained content. Full changelog: https://github.com/sahebansari/TerraPDF/blob/master/CHANGELOG.md</PackageReleaseNotes>
+    <PackageReleaseNotes>Version 2.4.0 is a performance release: documents render 2–30× faster with 60–95% fewer allocations. Wrapped text, tables, PNG images, custom fonts, QR codes, vector canvases and encrypted output are all faster; a logo reused across documents is converted once per process, and RGB and palette PNGs are embedded without decoding. Built-in font widths now match the Adobe AFM metrics (25 entries were wrong), so text containing those characters may wrap differently. Full changelog: https://github.com/sahebansari/TerraPDF/blob/master/CHANGELOG.md</PackageReleaseNotes>
 
      <!-- ── Source Link / reproducible build ────────────────────────────── -->
     <RepositoryUrl>https://github.com/sahebansari/TerraPDF</RepositoryUrl>
@@ -51,8 +51,8 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <PackageIcon>icon.png</PackageIcon>
-    <AssemblyVersion>2.3.0</AssemblyVersion>
-    <FileVersion>2.3.0</FileVersion>
+    <AssemblyVersion>2.4.0</AssemblyVersion>
+    <FileVersion>2.4.0</FileVersion>
   </PropertyGroup>
 
   <!-- Bundle the README into the NuGet package -->
