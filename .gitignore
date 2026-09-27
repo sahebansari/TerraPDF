@@ -50,3 +50,9 @@ appsettings.*.json
 
 # MCP server default output
 pdf-output/
+# ── BenchmarkDotNet ───────────────────────────────────────────────
+BenchmarkDotNet.Artifacts/
+
+# ── Python (tools/pdf-compare) ─────────────────────────────────────
+__pycache__/
+.venv/

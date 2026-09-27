@@ -21,7 +21,7 @@ namespace TerraPDF.Drawing.TrueType;
 /// </para>
 /// <para>
 /// Used by both <see cref="CustomFontVariant.MeasureWidth"/> and
-/// <see cref="PdfPage.EncodeIdentityHHex"/> — they must reorder identically,
+/// <see cref="PdfPage.AppendIdentityHHex"/> — they must reorder identically,
 /// otherwise <c>TextBlock</c>'s word-wrap (measured) and glyph drawing
 /// (drawn) would disagree.
 /// </para>

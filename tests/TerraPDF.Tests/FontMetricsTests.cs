@@ -55,11 +55,11 @@ public sealed class FontMetricsTests
     }
 
     [Fact]
-    public void MeasureWidthControlCharacterUsesFallbackWidth()
+    public void MeasureWidthControlCharacterMeasuresAsQuestionMark()
     {
-        // Characters outside the 32-126 range fall back to 500 units.
+        // Characters without a WinAnsi code are drawn as '?', so they measure as '?'.
         double actual = FontMetrics.MeasureWidth("\x01", 10, PdfFontFamily.Helvetica, false, false);
-        Assert.Equal(5.0, actual, precision: 2); // 500 / 1000 * 10
+        Assert.Equal(5.56, actual, precision: 2); // Helvetica '?' = 556 / 1000 * 10
     }
 
     // ── Family-name resolution ────────────────────────────────────────────────

@@ -1,0 +1,7 @@
+**/bin/
+**/obj/
+**/BenchmarkDotNet.Artifacts/
+**/TestResults/
+.git/
+.vs/
+.idea/

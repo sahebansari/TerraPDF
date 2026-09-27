@@ -166,11 +166,29 @@ public static class Color
 /// Internal RGB color value used by the rendering layer.
 /// Use <see cref="Color"/> for named color constants, then parse them with <see cref="FromHex"/>.
 /// </summary>
-public readonly struct PdfColor
+public readonly struct PdfColor : IEquatable<PdfColor>
 {
     public double R { get; init; }
     public double G { get; init; }
     public double B { get; init; }
+
+    // Explicit equality: the default ValueType.Equals compares double fields through
+    // reflection and boxes each one, and colours are compared for every text run drawn.
+
+    /// <summary>True when all three components are equal.</summary>
+    public bool Equals(PdfColor other) => R.Equals(other.R) && G.Equals(other.G) && B.Equals(other.B);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is PdfColor other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(R, G, B);
+
+    /// <summary>True when all three components are equal.</summary>
+    public static bool operator ==(PdfColor left, PdfColor right) => left.Equals(right);
+
+    /// <summary>True when any component differs.</summary>
+    public static bool operator !=(PdfColor left, PdfColor right) => !left.Equals(right);
 
     public static PdfColor FromRgb(byte r, byte g, byte b) =>
         new() { R = r / 255.0, G = g / 255.0, B = b / 255.0 };
@@ -182,6 +200,18 @@ public readonly struct PdfColor
     public static PdfColor FromHex(string hex)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hex);
+
+        // Allocation-free fast path for well-formed "#RRGGBB" / "#RRGGBBAA"; anything
+        // else takes the original path below, so errors are reported exactly as before.
+        var digits = hex.AsSpan().TrimStart('#');
+        if ((digits.Length == 6 || digits.Length == 8)
+            && TryHexByte(digits[0], digits[1], out byte r)
+            && TryHexByte(digits[2], digits[3], out byte g)
+            && TryHexByte(digits[4], digits[5], out byte b))
+        {
+            return FromRgb(r, g, b);
+        }
+
         hex = hex.TrimStart('#');
         if (hex.Length != 6 && hex.Length != 8)
             throw new ArgumentException(
@@ -192,4 +222,19 @@ public readonly struct PdfColor
             Convert.ToByte(hex[2..4], 16),
             Convert.ToByte(hex[4..6], 16));
     }
+
+    private static bool TryHexByte(char high, char low, out byte value)
+    {
+        int h = HexValue(high), l = HexValue(low);
+        value = (byte)((h << 4) | l);
+        return h >= 0 && l >= 0;
+    }
+
+    private static int HexValue(char c) => c switch
+    {
+        >= '0' and <= '9' => c - '0',
+        >= 'a' and <= 'f' => c - 'a' + 10,
+        >= 'A' and <= 'F' => c - 'A' + 10,
+        _ => -1,
+    };
 }

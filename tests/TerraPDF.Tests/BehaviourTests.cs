@@ -153,9 +153,10 @@ public sealed class BehaviourTests
                 col.Item().H1("Public chapter");
             }));
         }));
-        // Text is emitted word by word; the TOC page and the body each draw the visible heading once.
-        Assert.DoesNotContain("(Secret) Tj", content);
-        Assert.Equal(2, content.Split("(Public) Tj").Length - 1);
+        // Each line is emitted as one run; the TOC page ("1 Public chapter") and the body each draw
+        // the visible heading once.
+        Assert.DoesNotContain("Secret", content);
+        Assert.Equal(2, content.Split("Public chapter) Tj").Length - 1);
     }
 
     [Fact]

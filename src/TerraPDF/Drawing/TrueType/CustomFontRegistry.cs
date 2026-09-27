@@ -36,9 +36,11 @@ internal static class CustomFontRegistry
         if (_variants.TryGetValue((key, bold, italic), out variant))
             return true;
 
-        foreach (var (b, i) in FallbackOrder(bold, italic))
+        // Try every other combination, closest to the request first (no iterator: this runs
+        // once per text span laid out).
+        foreach (var (b, i) in AllStyles)
         {
-            if (_variants.TryGetValue((key, b, i), out variant))
+            if ((b, i) != (bold, italic) && _variants.TryGetValue((key, b, i), out variant))
                 return true;
         }
 
@@ -50,20 +52,18 @@ internal static class CustomFontRegistry
     internal static bool IsRegisteredFamily(string familyName)
     {
         string key = NormalizeName(familyName);
-        foreach (var (b, i) in FallbackOrder(false, false))
+        foreach (var (b, i) in AllStyles)
             if (_variants.ContainsKey((key, b, i)))
                 return true;
-        return _variants.ContainsKey((key, false, false));
+        return false;
     }
 
-    private static IEnumerable<(bool, bool)> FallbackOrder(bool bold, bool italic)
-    {
-        // Try every combination, closest to the request first, without repeating it.
-        (bool, bool)[] all = [(true, true), (true, false), (false, true), (false, false)];
-        foreach (var combo in all)
-            if (combo != (bold, italic))
-                yield return combo;
-    }
+    private static readonly (bool Bold, bool Italic)[] AllStyles = [(true, true), (true, false), (false, true), (false, false)];
 
-    private static string NormalizeName(string familyName) => familyName.Trim().ToLowerInvariant();
+    // Normalised family names, cached so resolving a font does not allocate on every call.
+    // Bounded by the number of distinct family names a process uses.
+    private static readonly ConcurrentDictionary<string, string> _normalizedNames = new();
+
+    private static string NormalizeName(string familyName) =>
+        _normalizedNames.GetOrAdd(familyName, static name => name.Trim().ToLowerInvariant());
 }

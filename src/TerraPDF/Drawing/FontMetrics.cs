@@ -4,7 +4,8 @@ namespace TerraPDF.Drawing;
 /// Character width tables from the Adobe Font Metrics (AFM) files for the
 /// built-in Type1 fonts used by TerraPDF.
 /// Widths are in PDF glyph units (1000 units = 1 em = font-size in points).
-/// Source: Adobe Core 14 Font AFM files (public domain).
+/// Source: Adobe Core 14 Font AFM files; every entry is checked against them by
+/// <c>FontMetricsTests</c> (the AFM files are in the test assets).
 /// <para>
 /// Tables cover the full WinAnsiEncoding range: byte positions 32–255
 /// (array indices 0–223, where index = byteValue − 32).
@@ -36,16 +37,16 @@ internal static class FontMetrics
           0,
         // ── Windows-1252 specials  (bytes 128–159 / 0x80–0x9F, indices 96–127) ─
         //  €      undef   ‚      ƒ      „      …      †      ‡
-        556,    0,   278,   556,   556,  1000,   556,   556,
+        556,    0,   222,   556,   333,  1000,   556,   556,
         //  ˆ      ‰      Š      ‹      Œ    undef    Ž    undef
-        333,  1000,   667,   333,  1000,     0,   667,     0,
+        333,  1000,   667,   333,  1000,     0,   611,     0,
         // undef    '      '      "      "      •      –      —
-          0,   278,   278,   556,   556,   278,   556,  1000,
+          0,   222,   222,   333,   333,   350,   556,  1000,
         //  ˜      ™      š      ›      œ    undef    ž      Ÿ
-        333,  1000,   556,   333,   944,     0,   500,   667,
+        333,  1000,   500,   333,   944,     0,   500,   667,
         // ── Latin-1 Supplement  (bytes 160–255 / 0xA0–0xFF, indices 128–223) ──
         //  NBSP   ¡      ¢      £      ¤      ¥      ¦      §
-        278,   278,   556,   556,   556,   556,   260,   556,
+        278,   333,   556,   556,   556,   556,   260,   556,
         //   ¨      ©      ª      «      ¬    SHY      ®      ¯
         333,   737,   370,   556,   584,   333,   737,   333,
         //   °      ±      ²      ³      ´      µ      ¶      ·
@@ -59,7 +60,7 @@ internal static class FontMetrics
         //   Ð      Ñ      Ò      Ó      Ô      Õ      Ö      ×
         722,   722,   778,   778,   778,   778,   778,   584,
         //   Ø      Ù      Ú      Û      Ü      Ý      Þ      ß
-        778,   722,   722,   722,   722,   667,   611,   556,
+        778,   722,   722,   722,   722,   667,   667,   611,
         //   à      á      â      ã      ä      å      æ      ç
         556,   556,   556,   556,   556,   556,   889,   500,
         //   è      é      ê      ë      ì      í      î      ï
@@ -77,7 +78,7 @@ internal static class FontMetrics
         250, 333, 555, 500, 500,1000, 833, 278, 333, 333, 500, 570, 250, 333, 250, 278, // 32–47
         500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 333, 333, 570, 570, 570, 500, // 48–63
         930, 722, 667, 722, 722, 667, 611, 778, 778, 389, 500, 778, 667, 944, 722, 778, // 64–79
-        611, 778, 722, 556, 667, 722, 722,1000, 722, 722, 611, 333, 278, 333, 581, 500, // 80–95
+        611, 778, 722, 556, 667, 722, 722,1000, 722, 722, 667, 333, 278, 333, 581, 500, // 80–95
         333, 500, 556, 444, 556, 444, 333, 500, 556, 278, 333, 556, 278, 833, 556, 500, // 96–111
         556, 556, 444, 389, 333, 556, 500, 722, 500, 500, 444, 394, 220, 394, 520,      // 112–126
         // ── DEL ──────────────────────────────────────────────────────────────
@@ -86,11 +87,11 @@ internal static class FontMetrics
         //  €    undef    ‚      ƒ      „      …      †      ‡
         500,    0,   333,   500,   500,  1000,   500,   500,
         //  ˆ      ‰      Š      ‹      Œ    undef    Ž    undef
-        333,  1000,   556,   333,  1000,     0,   611,     0,
+        333,  1000,   556,   333,  1000,     0,   667,     0,
         // undef    '      '      "      "      •      –      —
           0,   333,   333,   500,   500,   350,   500,  1000,
         //  ˜      ™      š      ›      œ    undef    ž      Ÿ
-        333,  1000,   444,   333,   722,     0,   444,   722,
+        333,  1000,   389,   333,   722,     0,   444,   722,
         // ── Latin-1 Supplement  (0xA0–0xFF) ──────────────────────────────────
         //  NBSP   ¡      ¢      £      ¤      ¥      ¦      §
         250,   333,   500,   500,   500,   500,   220,   500,
@@ -115,7 +116,7 @@ internal static class FontMetrics
         //   ð      ñ      ò      ó      ô      õ      ö      ÷
         500,   556,   500,   500,   500,   500,   500,   570,
         //   ø      ù      ú      û      ü      ý      þ      ÿ
-        556,   556,   556,   556,   556,   444,   500,   444,
+        500,   556,   556,   556,   556,   500,   556,   500,
     ];
 
     // -- Times-Italic ---------------------------------------------------------
@@ -132,16 +133,16 @@ internal static class FontMetrics
           0,
         // ── Windows-1252 specials  (0x80–0x9F) ───────────────────────────────
         //  €    undef    ‚      ƒ      „      …      †      ‡
-        500,    0,   333,   500,   444,   889,   500,   500,
+        500,    0,   333,   500,   556,   889,   500,   500,
         //  ˆ      ‰      Š      ‹      Œ    undef    Ž    undef
-        333,  1000,   500,   333,   889,     0,   556,     0,
+        333,  1000,   500,   333,   944,     0,   556,     0,
         // undef    '      '      "      "      •      –      —
           0,   333,   333,   556,   556,   350,   500,   889,
         //  ˜      ™      š      ›      œ    undef    ž      Ÿ
-        333,   760,   389,   333,   556,     0,   389,   556,
+        333,   980,   389,   333,   667,     0,   389,   556,
         // ── Latin-1 Supplement  (0xA0–0xFF) ──────────────────────────────────
         //  NBSP   ¡      ¢      £      ¤      ¥      ¦      §
-        250,   333,   500,   500,   500,   500,   220,   500,
+        250,   389,   500,   500,   500,   500,   275,   500,
         //   ¨      ©      ª      «      ¬    SHY      ®      ¯
         333,   760,   276,   500,   675,   333,   760,   333,
         //   °      ±      ²      ³      ´      µ      ¶      ·
@@ -341,7 +342,8 @@ internal static class FontMetrics
     /// the full WinAnsiEncoding range (accented Latin characters, curly quotes,
     /// em-dash, ellipsis, Euro sign, etc.).
     /// <para>
-    /// Characters outside WinAnsiEncoding (e.g. CJK, Arabic) fall back to 500 units.
+    /// Characters outside WinAnsiEncoding (e.g. CJK, Arabic) are drawn as <c>?</c>
+    /// (see <c>PdfPage.EscapeForPdfString</c>) and so are measured as <c>?</c>.
     /// </para>
     /// </summary>
     internal static double MeasureWidth(string text, double fontSize,
@@ -366,7 +368,8 @@ internal static class FontMetrics
             }
             else
             {
-                units = 500; // unmappable (CJK, Arabic, etc.) — substitution glyph
+                // Unmappable (CJK, Arabic, etc.): drawn as the '?' substitution glyph.
+                units = table['?' - 32];
             }
             total += units * fontSize / 1000.0;
         }

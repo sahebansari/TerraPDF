@@ -248,7 +248,7 @@ internal sealed class CanvasElement : Element
 
     private static void DrawQrCode(DrawingContext ctx, VectorCanvas.DrawQrCodeCmd qr)
     {
-        var symbol = Barcodes.QrCode.QrCodeGenerator.Generate(qr.Data, qr.Level);
+        var symbol = qr.Symbol ?? Barcodes.QrCode.QrCodeGenerator.Generate(qr.Data, qr.Level);
         int n = symbol.Size;
         int totalModules = n + 2 * qr.QuietZoneModules;
         double module = qr.Size / totalModules;
@@ -303,11 +303,10 @@ internal sealed class CanvasElement : Element
 
     private static void DrawImage(DrawingContext ctx, VectorCanvas.DrawImageCmd ic)
     {
-        // Building the element decodes the whole PNG, and a command is replayed once
-        // per page the canvas lands on — a header canvas on a 500-page document would
-        // decode 500 times. The decoded element is cached on the command instead; its
-        // resource alias is registered per page by PdfPage.DrawImage, so sharing one
-        // element across pages is safe.
+        // A command is replayed once per page the canvas lands on, so the element
+        // (header parse, content key) is cached on the command; its resource alias is
+        // registered per page by PdfPage.DrawImage, so sharing one element across
+        // pages is safe. PNG pixels are decoded once per distinct image at save time.
         ic.Decoded ??= new ImageElement(ic.Data);
         ic.Decoded.DrawAt(ctx.Page, ctx.X + ic.X, ctx.Y + ic.Y, ic.W, ic.H, ic.Fit);
     }

@@ -138,20 +138,61 @@ internal sealed class PdfDocument
             var imgMap = new Dictionary<string, int>();
             foreach (var (alias, img) in page.ImageObjects)
             {
-                string key = ImageContentKey(img.Data, img.Width, img.Height, img.IsJpeg, img.Components, img.Alpha);
+                string key = img.ContentKey;
                 if (imageObjectByHash.TryGetValue(key, out int existingId))
                 {
                     imgMap[alias] = existingId;
                     continue;
                 }
 
+                // RGB and palette PNGs are embedded still compressed: the viewer
+                // undoes the PNG row filters itself (/Predictor 15), so there is
+                // neither a decode nor a re-compression.
+                var passthrough = img.IsJpeg ? null : PngDecoder.TryReadPassthrough(img.Data);
+                if (passthrough is not null)
+                {
+                    string colorSpace = "/DeviceRGB";
+                    int colors = 3;
+                    if (passthrough.Palette is { } palette)
+                    {
+                        // Lookup table as its own stream, so encryption covers it like any stream.
+                        int paletteId = nextId++;
+                        byte[] paletteData = _encryption is not null
+                            ? _encryption.EncryptBytes(palette, paletteId, 0)
+                            : palette;
+                        binaryObjects.Add((paletteId, $"<< /Length {paletteData.Length} >>", paletteData));
+                        colorSpace = $"[/Indexed /DeviceRGB {palette.Length / 3 - 1} {paletteId} 0 R]";
+                        colors = 1;
+                    }
+
+                    int rawId = nextId++;
+                    imgMap[alias] = rawId;
+                    imageObjectByHash[key] = rawId;
+                    byte[] rawData = _encryption is not null
+                        ? _encryption.EncryptBytes(passthrough.ZlibData, rawId, 0)
+                        : passthrough.ZlibData;
+                    string rawDict =
+                        $"<< /Type /XObject /Subtype /Image " +
+                        $"/Width {img.Width} /Height {img.Height} " +
+                        $"/ColorSpace {colorSpace} /BitsPerComponent 8 " +
+                        $"/Filter /FlateDecode " +
+                        $"/DecodeParms << /Predictor 15 /Colors {colors} /BitsPerComponent 8 /Columns {img.Width} >> " +
+                        $"/Length {rawData.Length} >>";
+                    binaryObjects.Add((rawId, rawDict, rawData));
+                    continue;
+                }
+
+                // Other PNGs (alpha channel) are decoded and compressed here — or taken
+                // from the process-wide cache when an earlier document already converted
+                // the same file; JPEG bytes are embedded verbatim.
+                var encoded = img.IsJpeg ? null : EncodedImageCache.GetOrAdd(img, ConvertPng);
+
                 // RGBA transparency: emit the alpha channel as an 8-bit
                 // DeviceGray soft-mask image referenced via /SMask.
                 string smaskRef = string.Empty;
-                if (img.Alpha is not null)
+                if (encoded?.CompressedAlpha is { } alphaCompressed)
                 {
                     int smaskId = nextId++;
-                    byte[] alphaCompressed = Compress(img.Alpha);
                     byte[] alphaData = _encryption is not null
                         ? _encryption.EncryptBytes(alphaCompressed, smaskId, 0)
                         : alphaCompressed;
@@ -189,7 +230,7 @@ internal sealed class PdfDocument
                 }
                 else
                 {
-                    byte[] compressed = Compress(img.Data);
+                    byte[] compressed = encoded!.CompressedRgb;
                     byte[] imgData = _encryption is not null
                         ? _encryption.EncryptBytes(compressed, imgId, 0)
                         : compressed;
@@ -313,15 +354,14 @@ internal sealed class PdfDocument
         // When encrypted, compression happens first (the /Filter describes the
         // decoded stream; encryption is transparent to filters per PDF §7.6.1),
         // mirroring the PNG XObject path above.
+        var compressedPages = CompressContentStreams(_pages);
         var contentIds = new List<int>();
         for (int pi = 0; pi < _pages.Count; pi++)
         {
-            var page = _pages[pi];
-            string ops = page.BuildContentStream();
-            int cid    = nextId++;
+            int cid  = nextId++;
             contentIds.Add(cid);
 
-            byte[] compressed = Compress(enc.GetBytes(ops));
+            byte[] compressed = compressedPages[pi];
             byte[] data = _encryption is not null
                 ? _encryption.EncryptBytes(compressed, cid, 0)
                 : compressed;
@@ -536,6 +576,61 @@ internal sealed class PdfDocument
         // Formats a page dimension for the /MediaBox array using invariant culture
         private static string Inv(double d) =>
             d.ToString("F2", CultureInfo.InvariantCulture);
+
+        /// <summary>Documents at least this long compress their pages in parallel…</summary>
+        internal const int ParallelCompressionMinPages = 8;
+
+        /// <summary>…provided their content streams total at least this many characters.</summary>
+        internal const long ParallelCompressionMinChars = 512 * 1024;
+
+        /// <summary>Allows tests to compare the parallel and sequential paths; output is identical.</summary>
+        internal static bool ParallelCompressionEnabled { get; set; } = true;
+
+        // Compresses every page's content stream. Deflate is the most expensive step of
+        // saving a large document, and pages are independent, so large documents compress
+        // them on several cores. The results are placed by page index, so the output is
+        // identical either way. Small documents stay sequential: there the scheduling cost
+        // outweighs the gain, and a busy service already keeps every core occupied.
+        private static byte[][] CompressContentStreams(List<PdfPage> pages)
+        {
+            var result = new byte[pages.Count][];
+            long chars = 0;
+            foreach (var page in pages) chars += page.ContentLength;
+
+            if (ParallelCompressionEnabled
+                && Environment.ProcessorCount > 1
+                && pages.Count >= ParallelCompressionMinPages
+                && chars >= ParallelCompressionMinChars)
+            {
+                Parallel.For(0, pages.Count, i => result[i] = CompressContentStream(pages[i]));
+            }
+            else
+            {
+                for (int i = 0; i < pages.Count; i++)
+                    result[i] = CompressContentStream(pages[i]);
+            }
+            return result;
+        }
+
+        // Compresses a page's content stream straight from its operator buffer; the
+        // output is identical to Compress() over the stream's Latin-1 bytes.
+        private static byte[] CompressContentStream(PdfPage page)
+        {
+            using var ms   = new MemoryStream();
+            using var zlib = new ZLibStream(ms, CompressionLevel.Optimal);
+            page.WriteContentStream(zlib);
+            zlib.Flush();
+            zlib.Dispose();
+            return ms.ToArray();
+        }
+
+        // Decodes a PNG with an alpha channel and compresses its colour and alpha planes
+        // into the streams embedded as the image and its /SMask.
+        private static EncodedImageCache.Entry ConvertPng(ImageSource image)
+        {
+            byte[] rgb = image.DecodePng(out byte[]? alpha);
+            return new EncodedImageCache.Entry(Compress(rgb), alpha is null ? null : Compress(alpha));
+        }
 
         // Compresses raw bytes using zlib/deflate (FlateDecode in PDF terms)
         private static byte[] Compress(byte[] data)
@@ -825,26 +920,6 @@ internal sealed class PdfDocument
         return withBom;
     }
 
-    /// <summary>
-    /// Content-identity key for image deduplication: SHA-256 over the pixel/file
-    /// bytes plus the parameters that affect the emitted XObject.
-    /// </summary>
-    private static string ImageContentKey(byte[] data, int width, int height,
-        bool isJpeg, int components, byte[]? alpha)
-    {
-        using var sha = SHA256.Create();
-        sha.TransformBlock(data, 0, data.Length, null, 0);
-        if (alpha is not null)
-            sha.TransformBlock(alpha, 0, alpha.Length, null, 0);
-        byte[] meta =
-        [
-            (byte)(width  & 0xFF), (byte)((width  >> 8) & 0xFF), (byte)((width  >> 16) & 0xFF),
-            (byte)(height & 0xFF), (byte)((height >> 8) & 0xFF), (byte)((height >> 16) & 0xFF),
-            (byte)(isJpeg ? 1 : 0), (byte)components, (byte)(alpha is not null ? 1 : 0),
-        ];
-        sha.TransformFinalBlock(meta, 0, meta.Length);
-        return Convert.ToHexString(sha.Hash!);
-    }
 
     /// <summary>Converts a byte array to a PDF hex string token, e.g. &lt;AABBCC…&gt;.</summary>
     private static string BytesToHexString(byte[] bytes)

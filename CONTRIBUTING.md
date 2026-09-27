@@ -13,10 +13,11 @@ started, what we expect from contributions, and how the release process works.
 4. [Making Changes](#making-changes)
 5. [Coding Standards](#coding-standards)
 6. [Tests](#tests)
-7. [Submitting a Pull Request](#submitting-a-pull-request)
-8. [Reporting Bugs](#reporting-bugs)
-9. [Suggesting Features](#suggesting-features)
-10. [Release Process](#release-process)
+7. [Benchmarks](#benchmarks)
+8. [Submitting a Pull Request](#submitting-a-pull-request)
+9. [Reporting Bugs](#reporting-bugs)
+10. [Suggesting Features](#suggesting-features)
+11. [Release Process](#release-process)
 
 ---
 
@@ -60,6 +61,8 @@ TerraPDF/
 │       └── Infra/         # Public interfaces — IContainer, IDocument, IComponent
 ├── tests/
 │   └── TerraPDF.Tests/    # xUnit test projects
+├── benchmarks/
+│   └── TerraPDF.Benchmarks/  # BenchmarkDotNet performance suite
 ├── samples/
 │   └── TerraPDF.Sample/   # Six sample PDFs covering all major features
 ├── docs/                  # Markdown documentation
@@ -139,6 +142,22 @@ dotnet test -c Release --collect:"XPlat Code Coverage"
 ```
 
 Coverage reports (Cobertura XML) are written to `TestResults/`.
+
+---
+
+## Benchmarks
+
+Performance is tracked with the BenchmarkDotNet suite in
+`benchmarks/TerraPDF.Benchmarks/`:
+
+```sh
+dotnet run -c Release --project benchmarks/TerraPDF.Benchmarks -- --filter '*'
+```
+
+If your change touches layout, text, fonts, images, encryption or serialization,
+run the relevant benchmarks on `master` and on your branch, and paste both result
+tables (time **and** allocations) into the PR description. See
+[docs/benchmarks.md](docs/benchmarks.md) for the scenarios and how to compare runs.
 
 ---
 

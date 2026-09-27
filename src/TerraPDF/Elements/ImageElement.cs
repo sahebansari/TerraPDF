@@ -22,13 +22,10 @@ internal sealed class ImageElement : Element
     // Static counter used to generate a unique PDF resource alias per ImageElement instance
     private static int _aliasCounter;
 
-    private readonly byte[] _data;        // PNG: decoded RGB pixels | JPEG: raw file bytes
-    private readonly byte[]? _alpha;       // PNG RGBA: 8-bit alpha channel (null when opaque / JPEG)
+    private readonly ImageSource _source;  // original file bytes + header size; PNG pixels decoded at save time
     private readonly int _imgWidth;
     private readonly int _imgHeight;
     private readonly string _alias;       // PDF XObject resource name, e.g. "Im3"
-    private readonly bool _isJpeg;
-    private readonly int _components;  // colour component count (used to choose ColorSpace)
     private readonly double? _maxWidth;    // optional width cap in PDF points; null = fill available width
 
     internal (int Width, int Height) PixelSize => (_imgWidth, _imgHeight);
@@ -48,45 +45,20 @@ internal sealed class ImageElement : Element
     /// <exception cref="NotSupportedException">The data is neither PNG nor JPEG.</exception>
     internal ImageElement(byte[] imageData, double? width = null)
     {
-        if (IsJpegData(imageData))
-        {
-            // JPEG: read dimensions only - raw bytes are passed straight to PdfPage
-            using var ms = new MemoryStream(imageData, writable: false);
-            var info = JpegInfo.Read(ms);
-            _imgWidth = info.Width;
-            _imgHeight = info.Height;
-            _components = info.Components;
-            _data = imageData;
-            _isJpeg = true;
-        }
-        else if (IsPngData(imageData))
-        {
-            using var ms = new MemoryStream(imageData, writable: false);
-            _data = PngDecoder.Decode(ms, out _imgWidth, out _imgHeight, out _alpha);
-            _components = 3;
-            _isJpeg = false;
-        }
-        else
-        {
-            throw new NotSupportedException(
-                "Image data is not a recognised PNG or JPEG (checked by magic bytes). " +
-                "Only PNG and JPEG images are supported.");
-        }
+        // Only the header is read here; PNG pixels are decoded once per distinct
+        // image when the document is saved (see PdfDocument).
+        _source = ImageSource.FromBytes(imageData);
+        _imgWidth = _source.Width;
+        _imgHeight = _source.Height;
 
         _maxWidth = width;
         // Each element gets a unique alias so multiple images on the same page don't collide
         _alias = $"Im{System.Threading.Interlocked.Increment(ref _aliasCounter)}";
     }
 
-    private static bool IsPngData(byte[] d) =>
-        d.Length >= 8 && d[0] == 0x89 && d[1] == 0x50 && d[2] == 0x4E && d[3] == 0x47;
-
-    private static bool IsJpegData(byte[] d) =>
-        d.Length >= 2 && d[0] == 0xFF && d[1] == 0xD8;
-
     internal static void ValidateFormat(byte[] imageData)
     {
-        if (!IsPngData(imageData) && !IsJpegData(imageData))
+        if (!ImageSource.IsPngData(imageData) && !ImageSource.IsJpegData(imageData))
             throw new ArgumentException(
                 "Image data is not a recognised PNG or JPEG (checked by magic bytes). " +
                 "Only PNG and JPEG images are supported.", nameof(imageData));
@@ -130,9 +102,7 @@ internal sealed class ImageElement : Element
 
         var (drawW, drawH) = ScaledSize(ctx.Width, ctx.Height);
 
-        ctx.Page.DrawImage(_alias, _data, _imgWidth, _imgHeight,
-            ctx.X, ctx.Y, drawW, drawH,
-            _isJpeg, _components, _alpha);
+        ctx.Page.DrawImage(_alias, _source, ctx.X, ctx.Y, drawW, drawH);
     }
 
     internal void DrawAt(PdfPage page, double x, double y, double width, double height, ImageFit fit)
@@ -179,8 +149,7 @@ internal sealed class ImageElement : Element
             page.BeginClip(x, y, width, height);
         }
 
-        page.DrawImage(_alias, _data, _imgWidth, _imgHeight,
-            drawX, drawY, drawWidth, drawHeight, _isJpeg, _components, _alpha);
+        page.DrawImage(_alias, _source, drawX, drawY, drawWidth, drawHeight);
 
         if (fit is ImageFit.Cover or ImageFit.CoverTopLeft or ImageFit.CropTopLeft)
             page.EndClip();

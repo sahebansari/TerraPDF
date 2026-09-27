@@ -8,6 +8,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+- PNG images are no longer decoded when composed: only the header is read, and
+  pixels are decoded once per distinct image when the document is saved. Placing
+  the same PNG 40 times is ~20× faster and allocates ~40× less. Deduplication now
+  keys on the original file bytes instead of hashing decoded pixels.
+  `VectorCanvas.GetImageSizeInPoints` no longer decodes the image either.
+- Documents without page-number spans are no longer laid out a second time when
+  their page count has a different digit count from the initial estimate (99),
+  e.g. every 1–9 page document.
+- Text layout computes each word's width, font, and colour once instead of 4–5
+  times, and memoises wrapped lines and table row heights for the duration of a
+  publish. Text-heavy documents are ~2× faster with about half the allocations.
+- Drawing a page slice of a split table only visits that slice's cells instead
+  of scanning the whole table.
+- Content-stream numbers and escaped text are written straight into the page
+  buffer without temporary strings.
+- RGB and palette PNGs are embedded still compressed (`/FlateDecode` with
+  `/DecodeParms /Predictor 15`, palettes as an `/Indexed` lookup stream): no
+  decode and no re-compression. PNGs with an alpha channel are still decoded to
+  split out their `/SMask`.
+- Consecutive words and spaces in the same font, size and colour are shown by a
+  single `Tj` operator instead of one positioned `Tj` per word, making sample
+  PDFs up to 14% smaller. Justified lines keep one positioned word at a time.
+- Custom-font text with no Devanagari ि or virama skips the reordering and
+  conjunct-mapping pipeline when measured and encoded.
+- Font subsetting builds the `glyf` table at its exact size and no longer copies
+  unchanged tables (≈70% fewer allocations).
+- Page content streams are compressed straight from the operator buffer.
+- Canvas QR codes are encoded once when recorded rather than on every draw.
+- The PNG decoder reads the compressed data in place, decompresses into a single
+  buffer of the exact size, undoes the row filters in place, and allocates the
+  alpha plane only when a pixel is transparent: ~35% faster, ~70% less memory.
+- Much less allocation per text block and table cell: tokens share one
+  per-span format object, single-line blocks reuse their token list as the line,
+  token lists are sized exactly, rendering contexts are structs, `PdfColor`
+  implements `IEquatable<PdfColor>` (colour comparisons no longer box), and
+  hex colours and font names are resolved without allocating. Table rows now
+  allocate ~8 KB instead of ~26 KB, and text-heavy documents ~80% less.
+- QR code generation is 2–6× faster: the symbol is built on flat arrays, each
+  candidate mask is applied and undone in place instead of copying the matrix, and
+  the four penalty rules are scored bit-parallel on packed rows and columns. The
+  generated symbols are identical.
+- Content-stream numbers (`F2`/`F4` coordinates and colours) are written by a
+  fixed-point formatter instead of the general floating-point one, with
+  byte-identical output: vector-heavy pages are ~35% faster.
+- PNG images with an alpha channel are converted (decoded and compressed) once
+  per process: the resulting streams are kept in a bounded (32 MB) process-wide
+  cache keyed by the file's SHA-256, so a logo rendered into every document is
+  no longer decoded again for each one. Output is identical.
+- Large documents (8 pages or more and at least 512 K characters of content)
+  compress their page content streams in parallel. Output is identical.
+- New BenchmarkDotNet suite in `benchmarks/TerraPDF.Benchmarks`, and a throughput
+  harness (`benchmarks/TerraPDF.Throughput`) that measures pages per second, CPU
+  and memory, in or out of a container, and compares two versions (see
+  `docs/benchmarks.md`). In a 2-CPU / 1 GB container, with the logo cache warm,
+  invoices went from 356 to 10,200 pages/s and a 19-page annual report from
+  3,100 to 25,200 pages/s.
+- Output-comparison and profiling tools in `tools/pdf-compare` (byte, visual and
+  glyph-position comparison, PNG round trip, font-width check against a viewer,
+  QR symbol reference, allocation and CPU profiling).
+
+### Fixed
+- Built-in font widths now match the Adobe AFM metrics for every WinAnsi
+  character. 25 entries were wrong, among them the curly quotes, bullet,
+  `‚ „`, `š Ž Þ ß ¡` in Helvetica, `Z`, `Ž`, `š`, `ø`, `ý`, `þ`, `ÿ` in
+  Times-Bold, and `„ Œ ™ œ ¡ ¦` in Times-Italic. A test now checks every entry
+  against the AFM files.
+- Characters with no WinAnsi code (e.g. Cyrillic or CJK in a built-in font) are
+  measured as the `?` drawn in their place instead of a flat 500 units, so the
+  words after them no longer overlap.
+- Line wrapping and alignment can change slightly for text containing the
+  characters above, because they are now measured at their real width.
+
+
+---
+
+## [Unreleased]
+
+### Performance
+- PNG images are no longer decoded when composed: only the header is read, and
+  pixels are decoded once per distinct image when the document is saved. Placing
+  the same PNG 40 times is ~20× faster and allocates ~40× less. Deduplication now
+  keys on the original file bytes instead of hashing decoded pixels.
+  `VectorCanvas.GetImageSizeInPoints` no longer decodes the image either.
+- Documents without page-number spans are no longer laid out a second time when
+  their page count has a different digit count from the initial estimate (99),
+  e.g. every 1–9 page document.
+- Text layout computes each word's width, font, and colour once instead of 4–5
+  times, and memoises wrapped lines and table row heights for the duration of a
+  publish. Text-heavy documents are ~2× faster with about half the allocations.
+- Drawing a page slice of a split table only visits that slice's cells instead
+  of scanning the whole table.
+- Content-stream numbers and escaped text are written straight into the page
+  buffer without temporary strings.
+- New BenchmarkDotNet suite in `benchmarks/TerraPDF.Benchmarks` (see
+  `docs/benchmarks.md`).
+
 ---
 
 ## [2.3.0] - 2026-09-26

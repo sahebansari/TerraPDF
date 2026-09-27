@@ -104,10 +104,45 @@ public sealed class OutputFormatTests
         Assert.Equal(1, CountOccurrences(content, "ET\n"));
         Assert.Equal(1, CountOccurrences(content, " Tf\n"));
         Assert.Equal(1, CountOccurrences(content, " rg\n"));
-        // Words are still individual show ops at exact positions.
-        Assert.Contains("(one) Tj", content);
-        Assert.Contains("(two) Tj", content);
-        Assert.Contains("(three) Tj", content);
+        // Same-style words and the spaces between them share one show op.
+        Assert.Equal(1, CountOccurrences(content, " Tj\n"));
+        Assert.Contains("(one two three) Tj", content);
+    }
+
+    [Fact]
+    public void StyleChangeStartsANewShowOp()
+    {
+        byte[] bytes = Build(c => c.Page(p =>
+        {
+            p.Size(PageSize.A4);
+            p.Content().Text(t =>
+            {
+                t.Span("plain start ");
+                t.Span("bold middle").Bold();
+                t.Span(" plain end");
+            });
+        }));
+        string content = PdfTestUtils.InflatedText(bytes);
+
+        Assert.Contains("(plain start ) Tj", content);
+        Assert.Contains("(bold middle) Tj", content);
+        Assert.Contains("( plain end) Tj", content);
+    }
+
+    [Fact]
+    public void JustifiedLinesKeepOneShowOpPerWord()
+    {
+        byte[] bytes = Build(c => c.Page(p =>
+        {
+            p.Size(PageSize.A4);
+            p.Margin(2, Unit.Centimetre);
+            // Two lines, so the first one is justified (the last line falls back to left).
+            p.Content().Text(string.Join(' ', Enumerable.Repeat("justified words spread", 12))).Justify();
+        }));
+        string content = PdfTestUtils.InflatedText(bytes);
+
+        Assert.Contains("(justified) Tj", content);
+        Assert.Contains("(spread) Tj", content);
     }
 
     [Fact]

@@ -64,29 +64,37 @@ internal sealed partial class TrueTypeFont
 
         // Rebuild 'glyf': kept glyphs keep their original outline bytes (padded
         // to an even offset, as sfnt requires), blanked glyphs contribute nothing.
-        var newGlyf = new List<byte>((int)glyfTable.Length);
+        // First pass lays out the new offsets, so the table is allocated once at its
+        // exact size and filled with block copies.
         var newLocaOffsets = new uint[NumGlyphs + 1];
+        uint glyfLength = 0;
         for (int gid = 0; gid < NumGlyphs; gid++)
         {
-            newLocaOffsets[gid] = (uint)newGlyf.Count;
+            newLocaOffsets[gid] = glyfLength;
             if (!keep.Contains((ushort)gid)) continue;
 
             uint start = oldLocaOffsets[gid], end = oldLocaOffsets[gid + 1];
             if (end <= start) continue;
 
-            int len = (int)(end - start);
-            var bytes = new byte[len];
-            Array.Copy(RawData, (int)glyfTable.Offset + (int)start, bytes, 0, len);
-            newGlyf.AddRange(bytes);
-            if ((newGlyf.Count & 1) != 0) newGlyf.Add(0); // even-boundary padding between entries
+            glyfLength += end - start;
+            glyfLength += glyfLength & 1; // even-boundary padding between entries
         }
-        newLocaOffsets[NumGlyphs] = (uint)newGlyf.Count;
+        newLocaOffsets[NumGlyphs] = glyfLength;
+
+        var newGlyf = new byte[glyfLength]; // zero-initialised: padding bytes need no explicit fill
+        for (int gid = 0; gid < NumGlyphs; gid++)
+        {
+            if (newLocaOffsets[gid + 1] == newLocaOffsets[gid]) continue; // blanked or empty
+            uint start = oldLocaOffsets[gid];
+            uint len = oldLocaOffsets[gid + 1] - start;
+            Buffer.BlockCopy(RawData, (int)(glyfTable.Offset + start), newGlyf, (int)newLocaOffsets[gid], (int)len);
+        }
 
         int locaEntrySize = _indexToLocFormat == 0 ? 2 : 4;
         byte[] newLocaBytes = new byte[(NumGlyphs + 1) * locaEntrySize];
         WriteLocaOffsets(newLocaBytes, newLocaOffsets, _indexToLocFormat);
 
-        return RebuildSfnt(("glyf", newGlyf.ToArray()), ("loca", newLocaBytes));
+        return RebuildSfnt(("glyf", newGlyf), ("loca", newLocaBytes));
     }
 
     /// <summary>
@@ -198,7 +206,8 @@ internal sealed partial class TrueTypeFont
         var orderedTags = _tables.OrderBy(kv => kv.Value.Offset).Select(kv => kv.Key).ToList();
         int numTables = orderedTags.Count;
 
-        var bodies = new byte[numTables][];
+        // Unchanged tables are referenced in place in RawData, not copied.
+        var bodies = new ReadOnlyMemory<byte>[numTables];
         for (int i = 0; i < numTables; i++)
         {
             string tag = orderedTags[i];
@@ -209,9 +218,7 @@ internal sealed partial class TrueTypeFont
             else
             {
                 var (off, len) = _tables[tag];
-                var bytes = new byte[len];
-                Array.Copy(RawData, (int)off, bytes, 0, (int)len);
-                bodies[i] = bytes;
+                bodies[i] = RawData.AsMemory((int)off, (int)len);
             }
         }
 
@@ -240,7 +247,7 @@ internal sealed partial class TrueTypeFont
 
         int headIndex = orderedTags.IndexOf("head");
         for (int i = 0; i < numTables; i++)
-            Array.Copy(bodies[i], 0, result, (int)newOffsets[i], bodies[i].Length);
+            bodies[i].Span.CopyTo(result.AsSpan((int)newOffsets[i]));
 
         // checkSumAdjustment must be zero while every table's checksum (including head's own) is computed.
         if (headIndex >= 0)

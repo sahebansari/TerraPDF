@@ -137,6 +137,38 @@ public sealed class ImageFeatureTests
         Assert.DoesNotContain("/SMask", Raw(pdf));
     }
 
+    // ── PNG passthrough (no decode) ──────────────────────────────────────────
+
+    [Fact]
+    public void RgbPngIsEmbeddedWithoutDecoding()
+    {
+        byte[] png = TestImageData.MakePng(5, 3, rgba: false, alphaValue: 0);
+        string raw = Raw(Build(c => c.Page(p => p.Content().Image(png))));
+
+        Assert.Contains("/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode " +
+                        "/DecodeParms << /Predictor 15 /Colors 3 /BitsPerComponent 8 /Columns 5 >>", raw);
+    }
+
+    [Fact]
+    public void IndexedPngIsEmbeddedWithIndexedColorSpace()
+    {
+        byte[] png = TestImageData.MakeIndexedPng(4, 4, paletteSize: 5);
+        string raw = Raw(Build(c => c.Page(p => p.Content().Image(png))));
+
+        Assert.Matches(@"/ColorSpace \[/Indexed /DeviceRGB 4 \d+ 0 R\]", raw);
+        Assert.Contains("/DecodeParms << /Predictor 15 /Colors 1 /BitsPerComponent 8 /Columns 4 >>", raw);
+    }
+
+    [Fact]
+    public void RgbaPngIsStillDecoded()
+    {
+        byte[] png = TestImageData.MakePng(4, 4, rgba: true, alphaValue: 128);
+        string raw = Raw(Build(c => c.Page(p => p.Content().Image(png))));
+
+        Assert.DoesNotContain("/Predictor 15", raw);
+        Assert.Contains("/SMask ", raw);
+    }
+
     // ── Document-level deduplication ─────────────────────────────────────────
 
     [Fact]

@@ -4,8 +4,15 @@ using TerraPDF.Helpers;
 namespace TerraPDF.Elements;
 
 /// <summary>Rendering context passed down through the element tree.</summary>
-internal sealed class DrawingContext
+/// <remarks>
+/// A struct: every decorator and cell derives a repositioned context with <see cref="At"/>,
+/// and as a class that was one heap allocation per element per page drawn.
+/// </remarks>
+internal readonly struct DrawingContext
 {
+    // Declared so `new DrawingContext { … }` applies the property defaults below.
+    public DrawingContext() { }
+
     internal required PdfPage Page        { get; init; }
     internal double X                     { get; init; }
     internal double Y                     { get; init; }

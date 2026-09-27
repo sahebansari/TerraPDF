@@ -4,6 +4,10 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/TerraPDF.Benchmarks/TerraPDF.Benchmarks.csproj" />
+    <Project Path="benchmarks/TerraPDF.Throughput/TerraPDF.Throughput.csproj" />
+  </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/TerraPDF.Sample/TerraPDF.Sample.csproj" />
   </Folder>

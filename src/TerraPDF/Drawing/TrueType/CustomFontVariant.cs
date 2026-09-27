@@ -47,12 +47,49 @@ internal sealed class CustomFontVariant
     internal double MeasureWidth(string text, double fontSize)
     {
         double total = 0;
+
+        // Fast path: without ि (U+093F) or a virama (U+094D) there is nothing to reorder
+        // and no conjunct to form, so each scalar maps straight to its glyph. Same glyphs,
+        // same summation order as the general path, without its per-call list allocations.
+        if (!NeedsShaping(text))
+        {
+            for (int i = 0; i < text.Length; i++)
+            {
+                int cp = NextScalar(text, ref i);
+                total += Font.GetAdvanceWidthInEm(Font.GetGlyphId(cp)) * fontSize / 1000.0;
+            }
+            return total;
+        }
+
         var codepoints = DevanagariReordering.DecodeAndReorder(text);
         foreach (var (gid, _) in DevanagariConjuncts.MapToGlyphs(codepoints, Font))
         {
             total += Font.GetAdvanceWidthInEm(gid) * fontSize / 1000.0;
         }
         return total;
+    }
+
+    /// <summary>
+    /// True when <paramref name="text"/> needs Devanagari reordering or conjunct
+    /// substitution (it holds ि U+093F or a virama U+094D); otherwise each Unicode
+    /// scalar maps directly to one glyph.
+    /// </summary>
+    internal static bool NeedsShaping(string text) => text.AsSpan().IndexOfAny('\u093F', '\u094D') >= 0;
+
+    /// <summary>
+    /// Returns the Unicode scalar at <paramref name="i"/>, decoding a surrogate pair the same
+    /// way as <see cref="DevanagariReordering.DecodeAndReorder"/> and leaving
+    /// <paramref name="i"/> on its last UTF-16 unit.
+    /// </summary>
+    internal static int NextScalar(string text, ref int i)
+    {
+        if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+        {
+            int cp = char.ConvertToUtf32(text[i], text[i + 1]);
+            i++;
+            return cp;
+        }
+        return text[i];
     }
 
     /// <summary>

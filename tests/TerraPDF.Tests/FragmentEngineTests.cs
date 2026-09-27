@@ -131,7 +131,7 @@ public sealed class FragmentEngineTests
         Assert.Equal(4, pages);
 
         // The rendered TotalPages span must equal the actual page count.
-        Assert.Contains($"({pages}) Tj", PdfText(bytes));
+        Assert.Contains($" of {pages}) Tj", PdfText(bytes));
     }
 
     // ── Thread safety (static heading recorder removed) ───────────────────────

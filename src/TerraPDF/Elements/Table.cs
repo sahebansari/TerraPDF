@@ -113,8 +113,50 @@ internal sealed class Table : Element
 
     // -- Row heights -----------------------------------------------
 
+    /// <remarks>
+    /// Within one <see cref="LayoutPass"/> the last result is memoised: the pagination
+    /// engine and <see cref="Draw"/> ask for the same heights several times, and every
+    /// call otherwise re-measures every cell. The page-count hint is part of the key
+    /// only when a cell's text holds page-number spans. The returned array is shared
+    /// and must not be mutated.
+    /// </remarks>
     internal double[] GetRowHeights(double[] colWidths, TextStyle? defaultStyle = null,
         int totalPagesHint = Element.DefaultTotalPagesHint)
+    {
+        int pass = LayoutPass.Current;
+        var cached = _rowHeightsCache;
+        if (pass != 0 && cached is not null && cached.Pass == pass
+            && ReferenceEquals(cached.DefaultStyle, defaultStyle)
+            && cached.ColWidths.AsSpan().SequenceEqual(colWidths)
+            && (!cached.DependsOnPageCount || cached.TotalPagesHint == totalPagesHint))
+        {
+            // Keep the composer's page-count detection accurate on cache hits.
+            if (cached.DependsOnPageCount)
+                TextBlock.PageCountDependentLayouts++;
+            return cached.Heights;
+        }
+
+        int dependentBefore = TextBlock.PageCountDependentLayouts;
+        var heights = ComputeRowHeights(colWidths, defaultStyle, totalPagesHint);
+
+        if (pass != 0)
+        {
+            bool dependsOnPageCount = TextBlock.PageCountDependentLayouts != dependentBefore;
+            _rowHeightsCache = new RowHeightsCacheEntry(pass, (double[])colWidths.Clone(), defaultStyle,
+                totalPagesHint, dependsOnPageCount, heights);
+        }
+        return heights;
+    }
+
+    private sealed record RowHeightsCacheEntry(
+        int Pass, double[] ColWidths, TextStyle? DefaultStyle, int TotalPagesHint,
+        bool DependsOnPageCount, double[] Heights);
+
+    // Replaced as a whole (never mutated), so concurrent publishes of the same
+    // document at worst recompute the heights.
+    private RowHeightsCacheEntry? _rowHeightsCache;
+
+    private double[] ComputeRowHeights(double[] colWidths, TextStyle? defaultStyle, int totalPagesHint)
     {
         int rowCount = Cells.Count > 0
             ? Cells.Max(c => c.Row + c.RowSpan - 1)
@@ -167,6 +209,30 @@ internal sealed class Table : Element
         return width;
     }
 
+    /// <summary>Indices into <see cref="Cells"/> grouped by 0-based starting row.</summary>
+    private Dictionary<int, List<int>> CellIndicesByRow()
+    {
+        var cached = _cellIndicesByRow;
+        if (cached is not null && cached.CellCount == Cells.Count)
+            return cached.Index;
+
+        var index = new Dictionary<int, List<int>>();
+        for (int i = 0; i < Cells.Count; i++)
+        {
+            int r = Cells[i].Row - 1;
+            if (!index.TryGetValue(r, out var list))
+                index[r] = list = [];
+            list.Add(i);
+        }
+        _cellIndicesByRow = new CellRowIndex(Cells.Count, index);
+        return index;
+    }
+
+    private sealed record CellRowIndex(int CellCount, Dictionary<int, List<int>> Index);
+
+    // Rebuilt when cells are added; replaced as a whole so readers never see a torn update.
+    private CellRowIndex? _cellIndicesByRow;
+
     // -- Measure ---------------------------------------------------
 
     internal override ElementSize Measure(double w, double h, TextStyle? defaultStyle = null,
@@ -216,12 +282,22 @@ internal sealed class Table : Element
             }
         }
 
-        foreach (var cell in Cells)
+        // Only the cells starting in a drawn row, in their original order — a page
+        // slice must not scan the whole table, or drawing an N-row table costs O(N²).
+        var cellsByRow = CellIndicesByRow();
+        var drawn = new List<int>();
+        foreach (int ri in rowY.Keys)
+            if (cellsByRow.TryGetValue(ri, out var indices))
+                drawn.AddRange(indices);
+        drawn.Sort();
+
+        foreach (int cellIndex in drawn)
         {
+            var cell = Cells[cellIndex];
             int ri = cell.Row    - 1;  // 0-based
             int ci = cell.Column - 1;  // 0-based
 
-            if (!rowY.TryGetValue(ri, out double cellY)) continue;
+            double cellY = rowY[ri];
             if (ci < 0 || ci >= colWidths.Length || ri >= rowHeights.Length) continue;
 
             double cellX = colX[ci];

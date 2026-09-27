@@ -818,16 +818,20 @@ public sealed class DocumentComposer : IDocumentContainer
     /// A wider placeholder (e.g. "120" vs "99") can change footer wrapping and
     /// thus the available content height, so counting and measuring must agree.
     /// Converges in one extra pass for realistic documents; bounded at 3.
+    /// When no measured text depends on the page count (no page-number spans
+    /// were laid out), the first pass is already final and no re-layout runs.
     /// The returned fragments are exactly what will be rendered, so the page
     /// count and the drawn pages can never disagree.
     /// </summary>
     private (int TotalPages, List<List<PageFragment>> Fragments) LayoutAllStable(ref int totalPagesHint)
     {
         int hint = totalPagesHint;
+        int dependentBefore = TextBlock.PageCountDependentLayouts;
         var fragments = _pages.Select(p => LayoutDescriptor(p, hint)).ToList();
         int total = fragments.Sum(f => f.Count);
+        bool dependsOnPageCount = TextBlock.PageCountDependentLayouts != dependentBefore;
 
-        for (int i = 0; i < 3 && Digits(total) != Digits(hint); i++)
+        for (int i = 0; i < 3 && dependsOnPageCount && Digits(total) != Digits(hint); i++)
         {
             hint      = total;
             fragments = _pages.Select(p => LayoutDescriptor(p, hint)).ToList();
@@ -840,6 +844,9 @@ public sealed class DocumentComposer : IDocumentContainer
 
     private void WriteTo(Stream output)
     {
+        // Elements memoise layout results for the duration of this publish only.
+        using var layoutPass = LayoutPass.Begin();
+
         // 1. Locate any TOC page(s)
         var tocPageIndices = new List<int>();
         for (int i = 0; i < _pages.Count; i++)

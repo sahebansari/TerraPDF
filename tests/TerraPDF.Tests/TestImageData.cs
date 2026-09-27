@@ -43,11 +43,36 @@ internal static class TestImageData
             });
 
     /// <summary>
+    /// Builds an 8-bit indexed (colour type 3) PNG with a <paramref name="paletteSize"/>-entry
+    /// palette; pixel (x, y) uses palette index <c>(x + y) % paletteSize</c>.
+    /// </summary>
+    internal static byte[] MakeIndexedPng(int width, int height, int paletteSize)
+    {
+        var palette = new byte[paletteSize * 3];
+        for (int i = 0; i < paletteSize; i++)
+        {
+            palette[i * 3]     = (byte)(i * 40);
+            palette[i * 3 + 1] = (byte)(255 - i * 40);
+            palette[i * 3 + 2] = 128;
+        }
+        return BuildPng(width, height, colorType: 3,
+            writePixel: (buffer, offset) =>
+            {
+                int stride = 1 + width;              // filter byte + one index per pixel
+                int y = offset / stride;
+                int x = offset % stride - 1;
+                buffer[offset] = (byte)((x + y) % paletteSize);
+                return 1;
+            },
+            palette);
+    }
+
+    /// <summary>
     /// Writes a minimal single-IDAT PNG. <paramref name="writePixel"/> fills one pixel at
     /// the given offset and returns how many bytes it wrote (the source bytes per pixel).
     /// </summary>
     private static byte[] BuildPng(int width, int height, int colorType,
-        Func<byte[], int, int> writePixel)
+        Func<byte[], int, int> writePixel, byte[]? palette = null)
     {
         using var stream = new MemoryStream();
 
@@ -81,8 +106,9 @@ internal static class TestImageData
         header[8] = 8;
         header[9] = (byte)colorType;
         WriteChunk("IHDR", header);
+        if (palette is not null) WriteChunk("PLTE", palette);
 
-        int bytesPerPixel = colorType switch { 2 => 3, 4 => 2, 6 => 4, _ => 3 };
+        int bytesPerPixel = colorType switch { 2 => 3, 3 => 1, 4 => 2, 6 => 4, _ => 3 };
         var scanlines = new byte[height * (1 + width * bytesPerPixel)];
         int offset = 0;
         for (int y = 0; y < height; y++)

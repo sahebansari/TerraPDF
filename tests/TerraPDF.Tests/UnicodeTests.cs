@@ -91,7 +91,7 @@ public sealed class UnicodeTests
     // é in Times-Italic — AFM: 444 units
     [InlineData("é",  10, "Times",     false, true,  4.44)]
     // Unmappable character falls back to 500 units
-    [InlineData("中", 10, "Helvetica", false, false, 5.0)]
+    [InlineData("中", 10, "Helvetica", false, false, 5.56)]
     public void MeasureWidthSupportsExtendedWinAnsiCharacters(
         string text, double fontSize, string family, bool bold, bool italic, double expectedPts)
     {

@@ -99,7 +99,15 @@ public sealed class VectorCanvas
 
     internal sealed record DrawQrCodeCmd(
         string Data, double X, double Y, double Size, QrErrorCorrectionLevel Level,
-        string Hex, string? BackgroundHex, int QuietZoneModules) : DrawCommand;
+        string Hex, string? BackgroundHex, int QuietZoneModules) : DrawCommand
+    {
+        /// <summary>
+        /// The encoded symbol, generated once when the command is recorded (which also
+        /// validates the data) and reused on every replay, so a canvas repeated across
+        /// pages does not re-encode its QR code per page.
+        /// </summary>
+        internal TerraPDF.Barcodes.QrCode.QrCode? Symbol { get; init; }
+    }
 
     internal sealed record DrawPathCmd(PathDescriptor Path) : DrawCommand;
 
@@ -107,9 +115,9 @@ public sealed class VectorCanvas
         byte[] Data, double X, double Y, double W, double H, ImageFit Fit) : DrawCommand
     {
         /// <summary>
-        /// The decoded image, populated by <c>CanvasElement</c> on first draw and reused
+        /// The image element, populated by <c>CanvasElement</c> on first draw and reused
         /// on every later replay of this command so a canvas repeated across pages
-        /// decodes its PNG once rather than once per page. Excluded from record equality
+        /// parses and hashes its image once rather than once per page. Excluded from record equality
         /// and value semantics on purpose — it is a cache, not part of the command.
         /// </summary>
         internal Elements.ImageElement? Decoded { get; set; }
@@ -659,8 +667,11 @@ public sealed class VectorCanvas
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
         ArgumentOutOfRangeException.ThrowIfNegative(quietZoneModules);
         // Fails now, at the call site, rather than later when the page is rendered.
-        _ = TerraPDF.Barcodes.QrCode.QrCodeGenerator.Generate(data, level);
-        Commands.Add(new DrawQrCodeCmd(data, x, y, size, level, hexColor, backgroundHex, quietZoneModules));
+        var symbol = TerraPDF.Barcodes.QrCode.QrCodeGenerator.Generate(data, level);
+        Commands.Add(new DrawQrCodeCmd(data, x, y, size, level, hexColor, backgroundHex, quietZoneModules)
+        {
+            Symbol = symbol,
+        });
         return this;
     }
 

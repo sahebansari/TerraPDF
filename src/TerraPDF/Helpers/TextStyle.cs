@@ -63,7 +63,11 @@ public sealed class TextStyle
     // -- Defaults ---------------------------------------------------
 
     /// <summary>Base default style (Helvetica, 12pt, black).</summary>
-    internal static TextStyle Default => new()
+    /// <remarks>
+    /// A single shared instance: the type is immutable, and this is read for every
+    /// <c>DrawingContext</c> created during rendering.
+    /// </remarks>
+    internal static TextStyle Default { get; } = new()
     {
         Size     = 12,
         Color    = "#000000",
