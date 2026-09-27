@@ -145,15 +145,18 @@ internal sealed class PdfDocument
                     continue;
                 }
 
+                // PNGs are converted once per process and cached (see ConvertPng); JPEG
+                // bytes are embedded verbatim.
+                var encoded = img.IsJpeg ? null : EncodedImageCache.GetOrAdd(img, ConvertPng);
+
                 // RGB and palette PNGs are embedded still compressed: the viewer
                 // undoes the PNG row filters itself (/Predictor 15), so there is
                 // neither a decode nor a re-compression.
-                var passthrough = img.IsJpeg ? null : PngDecoder.TryReadPassthrough(img.Data);
-                if (passthrough is not null)
+                if (encoded is { IsPngPredicted: true })
                 {
                     string colorSpace = "/DeviceRGB";
                     int colors = 3;
-                    if (passthrough.Palette is { } palette)
+                    if (encoded.Palette is { } palette)
                     {
                         // Lookup table as its own stream, so encryption covers it like any stream.
                         int paletteId = nextId++;
@@ -169,8 +172,8 @@ internal sealed class PdfDocument
                     imgMap[alias] = rawId;
                     imageObjectByHash[key] = rawId;
                     byte[] rawData = _encryption is not null
-                        ? _encryption.EncryptBytes(passthrough.ZlibData, rawId, 0)
-                        : passthrough.ZlibData;
+                        ? _encryption.EncryptBytes(encoded.CompressedRgb, rawId, 0)
+                        : encoded.CompressedRgb;
                     string rawDict =
                         $"<< /Type /XObject /Subtype /Image " +
                         $"/Width {img.Width} /Height {img.Height} " +
@@ -181,11 +184,6 @@ internal sealed class PdfDocument
                     binaryObjects.Add((rawId, rawDict, rawData));
                     continue;
                 }
-
-                // Other PNGs (alpha channel) are decoded and compressed here — or taken
-                // from the process-wide cache when an earlier document already converted
-                // the same file; JPEG bytes are embedded verbatim.
-                var encoded = img.IsJpeg ? null : EncodedImageCache.GetOrAdd(img, ConvertPng);
 
                 // RGBA transparency: emit the alpha channel as an 8-bit
                 // DeviceGray soft-mask image referenced via /SMask.
@@ -624,10 +622,15 @@ internal sealed class PdfDocument
             return ms.ToArray();
         }
 
-        // Decodes a PNG with an alpha channel and compresses its colour and alpha planes
-        // into the streams embedded as the image and its /SMask.
+        // Converts a PNG for embedding. RGB and palette PNGs whose data checks out keep
+        // their compressed data as is; others (alpha channel, or malformed data, which
+        // the decoder then reports) are decoded, and their colour and alpha planes
+        // compressed into the streams embedded as the image and its /SMask.
         private static EncodedImageCache.Entry ConvertPng(ImageSource image)
         {
+            if (PngDecoder.TryReadPassthrough(image.Data) is { } passthrough)
+                return new EncodedImageCache.Entry(passthrough.ZlibData, null, IsPngPredicted: true, passthrough.Palette);
+
             byte[] rgb = image.DecodePng(out byte[]? alpha);
             return new EncodedImageCache.Entry(Compress(rgb), alpha is null ? null : Compress(alpha));
         }
